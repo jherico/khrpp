@@ -12,10 +12,14 @@
 
 #include <unordered_map>
 
-namespace khronos { namespace gl {
+#include <KHR/khrplatform.h>
+
+namespace khronos {
+namespace gl {
 
 enum class Type : uint32_t
 {
+    COMPRESSED = 0,
     // GL 4.4 Table 8.2
     UNSIGNED_BYTE = 0x1401,
     BYTE = 0x1400,
@@ -47,13 +51,14 @@ namespace texture {
 
 enum class Format : uint32_t
 {
-    COMPRESSED_FORMAT = 0,
+    COMPRESSED = 0,
 
     // GL 4.4 Table 8.3
     STENCIL_INDEX = 0x1901,
     DEPTH_COMPONENT = 0x1902,
     DEPTH_STENCIL = 0x84F9,
 
+    LUMINANCE = 0x1909,
     RED = 0x1903,
     GREEN = 0x1904,
     BLUE = 0x1905,
@@ -75,6 +80,9 @@ enum class Format : uint32_t
 
 enum class InternalFormat : uint32_t
 {
+    // GLES 2.0 
+    LUMINANCE8 = 0x8040,
+
     // GL 4.4 Table 8.12
     R8 = 0x8229,
     R8_SNORM = 0x8F94,
@@ -185,11 +193,12 @@ enum class InternalFormat : uint32_t
 
     COMPRESSED_RGB_S3TC_DXT1_EXT = 0x83F0,
     COMPRESSED_RGBA_S3TC_DXT1_EXT = 0x83F1,
+    COMPRESSED_RGBA_S3TC_DXT3_EXT = 0x83F2,
+    COMPRESSED_RGBA_S3TC_DXT5_EXT = 0x83F3,
     COMPRESSED_SRGB_S3TC_DXT1_EXT = 0x8C4C,
     COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT = 0x8C4D,
     COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT = 0x8C4E,
     COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT = 0x8C4F,
-    COMPRESSED_RGBA_S3TC_DXT5_EXT = 0x83F3,
 
     COMPRESSED_RED_RGTC1 = 0x8DBB,
     COMPRESSED_SIGNED_RED_RGTC1 = 0x8DBC,
@@ -212,64 +221,56 @@ enum class InternalFormat : uint32_t
     COMPRESSED_SIGNED_R11_EAC = 0x9271,
     COMPRESSED_RG11_EAC = 0x9272,
     COMPRESSED_SIGNED_RG11_EAC = 0x9273,
+
+    COMPRESSED_RGBA_ASTC_4x4 = 0x93b0,
+    COMPRESSED_RGBA_ASTC_5x4 = 0x93b1,
+    COMPRESSED_RGBA_ASTC_5x5 = 0x93b2,
+    COMPRESSED_RGBA_ASTC_6x5 = 0x93b3,
+    COMPRESSED_RGBA_ASTC_6x6 = 0x93b4,
+    COMPRESSED_RGBA_ASTC_8x5 = 0x93b5,
+    COMPRESSED_RGBA_ASTC_8x6 = 0x93b6,
+    COMPRESSED_RGBA_ASTC_8x8 = 0x93b7,
+    COMPRESSED_RGBA_ASTC_10x5 = 0x93b8,
+    COMPRESSED_RGBA_ASTC_10x6 = 0x93b9,
+    COMPRESSED_RGBA_ASTC_10x8 = 0x93ba,
+    COMPRESSED_RGBA_ASTC_10x10 = 0x93bb,
+    COMPRESSED_RGBA_ASTC_12x10 = 0x93bc,
+    COMPRESSED_RGBA_ASTC_12x12 = 0x93bd,
+    COMPRESSED_RGBA_ASTC_3x3x3_OES = 0x93c0,
+    COMPRESSED_RGBA_ASTC_4x3x3_OES = 0x93c1,
+    COMPRESSED_RGBA_ASTC_4x4x3_OES = 0x93c2,
+    COMPRESSED_RGBA_ASTC_4x4x4_OES = 0x93c3,
+    COMPRESSED_RGBA_ASTC_5x4x4_OES = 0x93c4,
+    COMPRESSED_RGBA_ASTC_5x5x4_OES = 0x93c5,
+    COMPRESSED_RGBA_ASTC_5x5x5_OES = 0x93c6,
+    COMPRESSED_RGBA_ASTC_6x5x5_OES = 0x93c7,
+    COMPRESSED_RGBA_ASTC_6x6x5_OES = 0x93c8,
+    COMPRESSED_RGBA_ASTC_6x6x6_OES = 0x93c9,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_4x4 = 0x93d0,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_5x4 = 0x93d1,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_5x5 = 0x93d2,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_6x5 = 0x93d3,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_6x6 = 0x93d4,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_8x5 = 0x93d5,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_8x6 = 0x93d6,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_8x8 = 0x93d7,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_10x5 = 0x93d8,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_10x6 = 0x93d9,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_10x8 = 0x93da,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_10x10 = 0x93db,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_12x10 = 0x93dc,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_12x12 = 0x93dd,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_3x3x3_OES = 0x93e0,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_4x3x3_OES = 0x93e1,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x3_OES = 0x93e2,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x4_OES = 0x93e3,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_5x4x4_OES = 0x93e4,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x4_OES = 0x93e5,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x5_OES = 0x93e6,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_6x5x5_OES = 0x93e7,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x5_OES = 0x93e8,
+    COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x6_OES = 0x93e9,
 };
-
-static std::unordered_map<std::string, InternalFormat> nameToFormat{
-    { "COMPRESSED_RED", InternalFormat::COMPRESSED_RED },
-    { "COMPRESSED_RG", InternalFormat::COMPRESSED_RG },
-    { "COMPRESSED_RGB", InternalFormat::COMPRESSED_RGB },
-    { "COMPRESSED_RGBA", InternalFormat::COMPRESSED_RGBA },
-
-    { "COMPRESSED_SRGB", InternalFormat::COMPRESSED_SRGB },
-    { "COMPRESSED_SRGB_ALPHA", InternalFormat::COMPRESSED_SRGB_ALPHA },
-
-    { "COMPRESSED_ETC1_RGB8_OES", InternalFormat::COMPRESSED_ETC1_RGB8_OES },
-
-    { "COMPRESSED_SRGB_S3TC_DXT1_EXT", InternalFormat::COMPRESSED_SRGB_S3TC_DXT1_EXT },
-    { "COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT", InternalFormat::COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT },
-    { "COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT", InternalFormat::COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT },
-    { "COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT", InternalFormat::COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT },
-
-    { "COMPRESSED_RED_RGTC1", InternalFormat::COMPRESSED_RED_RGTC1 },
-    { "COMPRESSED_SIGNED_RED_RGTC1", InternalFormat::COMPRESSED_SIGNED_RED_RGTC1 },
-    { "COMPRESSED_RG_RGTC2", InternalFormat::COMPRESSED_RG_RGTC2 },
-    { "COMPRESSED_SIGNED_RG_RGTC2", InternalFormat::COMPRESSED_SIGNED_RG_RGTC2 },
-
-    { "COMPRESSED_RGBA_BPTC_UNORM", InternalFormat::COMPRESSED_RGBA_BPTC_UNORM },
-    { "COMPRESSED_SRGB_ALPHA_BPTC_UNORM", InternalFormat::COMPRESSED_SRGB_ALPHA_BPTC_UNORM },
-    { "COMPRESSED_RGB_BPTC_SIGNED_FLOAT", InternalFormat::COMPRESSED_RGB_BPTC_SIGNED_FLOAT },
-    { "COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT", InternalFormat::COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT },
-
-    { "COMPRESSED_RGB8_ETC2", InternalFormat::COMPRESSED_RGB8_ETC2 },
-    { "COMPRESSED_SRGB8_ETC2", InternalFormat::COMPRESSED_SRGB8_ETC2 },
-    { "COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2", InternalFormat::COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 },
-    { "COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2", InternalFormat::COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 },
-    { "COMPRESSED_RGBA8_ETC2_EAC", InternalFormat::COMPRESSED_RGBA8_ETC2_EAC },
-    { "COMPRESSED_SRGB8_ALPHA8_ETC2_EAC", InternalFormat::COMPRESSED_SRGB8_ALPHA8_ETC2_EAC },
-
-    { "COMPRESSED_R11_EAC", InternalFormat::COMPRESSED_R11_EAC },
-    { "COMPRESSED_SIGNED_R11_EAC", InternalFormat::COMPRESSED_SIGNED_R11_EAC },
-    { "COMPRESSED_RG11_EAC", InternalFormat::COMPRESSED_RG11_EAC },
-    { "COMPRESSED_SIGNED_RG11_EAC", InternalFormat::COMPRESSED_SIGNED_RG11_EAC },
-};
-
-inline const char* toString(InternalFormat format) {
-    for (auto& pair : nameToFormat) {
-        if (pair.second == format) {
-            return pair.first.data();
-        }
-    }
-    return nullptr;
-}
-
-inline bool fromString(const char* name, InternalFormat* format) {
-    auto it = nameToFormat.find(name);
-    if (it == nameToFormat.end()) {
-        return false;
-    }
-    *format = it->second;
-    return true;
-}
 
 inline uint8_t evalUncompressedBlockBitSize(InternalFormat format) {
     switch (format) {
@@ -372,7 +373,7 @@ inline uint8_t evalUncompressedBlockBitSize(InternalFormat format) {
             return 40;
 
         default:
-            return 0;
+            throw std::runtime_error("Bad format");
     }
 }
 
@@ -458,10 +459,13 @@ enum class BaseInternalFormat : uint32_t
     // GL 4.4 Table 8.11
     DEPTH_COMPONENT = 0x1902,
     DEPTH_STENCIL = 0x84F9,
+    LUMINANCE = 0x1909,
     RED = 0x1903,
     RG = 0x8227,
     RGB = 0x1907,
     RGBA = 0x1908,
+    SRGB = 0x8C40,
+    SRGB_ALPHA = 0x8C42,
     STENCIL_INDEX = 0x1901,
 };
 
@@ -470,20 +474,17 @@ inline uint8_t evalComponentCount(BaseInternalFormat format) {
         case BaseInternalFormat::DEPTH_COMPONENT:
         case BaseInternalFormat::STENCIL_INDEX:
         case BaseInternalFormat::RED:
+        case BaseInternalFormat::LUMINANCE:
             return 1;
-
         case BaseInternalFormat::DEPTH_STENCIL:
         case BaseInternalFormat::RG:
             return 2;
-
         case BaseInternalFormat::RGB:
             return 3;
 
         case BaseInternalFormat::RGBA:
             return 4;
 
-        default:
-            break;
     }
 
     return 0;

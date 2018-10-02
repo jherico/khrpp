@@ -119,8 +119,6 @@ inline bool checkAlignment(T value) {
 
 // Header
 struct Header {
-    static const uint32_t COMPRESSED_FORMAT{ 0 };
-    static const uint32_t COMPRESSED_TYPE{ 0 };
     static const uint32_t COMPRESSED_TYPE_SIZE{ 1 };
     static const size_t IDENTIFIER_LENGTH{ 12 };
     using Identifier = std::array<uint8_t, IDENTIFIER_LENGTH>;
@@ -134,11 +132,11 @@ struct Header {
     Byte identifier[IDENTIFIER_LENGTH];
     uint32_t endianness{ ENDIAN_TEST };
 
-    uint32_t glType{ static_cast<uint32_t>(GLType::UNSIGNED_BYTE) };
+    GLType glType{ static_cast<uint32_t>(GLType::UNSIGNED_BYTE) };
     uint32_t glTypeSize{ 0 };
-    uint32_t glFormat{ static_cast<uint32_t>(GLFormat::RGBA) };
-    uint32_t glInternalFormat{ static_cast<uint32_t>(GLInternalFormat::RGBA8) };
-    uint32_t glBaseInternalFormat{ static_cast<uint32_t>(GLBaseInternalFormat::RGBA) };
+    GLFormat glFormat{ GLFormat::RGBA };
+    GLInternalFormat glInternalFormat{ GLInternalFormat::RGBA8 };
+    GLBaseInternalFormat glBaseInternalFormat{ GLBaseInternalFormat::RGBA };
 
     uint32_t pixelWidth{ 1 };
     uint32_t pixelHeight{ 1 };
@@ -155,7 +153,7 @@ struct Header {
     uint32_t getNumberOfSlices() const { return (numberOfArrayElements ? numberOfArrayElements : 1); }
     uint32_t getNumberOfLevels() const { return (numberOfMipmapLevels ? numberOfMipmapLevels : 1); }
     bool isArray() const { return numberOfArrayElements > 0; }
-    bool isCompressed() const { return glFormat == COMPRESSED_FORMAT; }
+    bool isCompressed() const { return glFormat == GLFormat::COMPRESSED; }
 
     uint32_t evalMaxDimension() const;
     uint32_t evalPixelOrBlockWidth(uint32_t level) const;
@@ -172,20 +170,20 @@ struct Header {
     // FIXME base internal format should automatically be determined by internal format
     // FIXME type size should automatically be determined by type
     void setUncompressed(GLType type, uint32_t typeSize, GLFormat format, GLInternalFormat internalFormat, GLBaseInternalFormat baseInternalFormat) {
-        glType = (uint32_t)type;
+        glType = type;
         glTypeSize = typeSize;
-        glFormat = (uint32_t)format;
-        glInternalFormat = (uint32_t)internalFormat;
-        glBaseInternalFormat = (uint32_t)baseInternalFormat;
+        glFormat = format;
+        glInternalFormat = internalFormat;
+        glBaseInternalFormat = baseInternalFormat;
     }
 
     // FIXME base internal format should automatically be determined by internal format
     void setCompressed(GLInternalFormat internalFormat, GLBaseInternalFormat baseInternalFormat) {
-        glType = COMPRESSED_TYPE;
-        glFormat = COMPRESSED_FORMAT;
+        glType = GLType::COMPRESSED;
+        glFormat = GLFormat::COMPRESSED;
         glTypeSize = COMPRESSED_TYPE_SIZE;
-        glInternalFormat = (uint32_t)internalFormat;
-        glBaseInternalFormat = (uint32_t)baseInternalFormat;
+        glInternalFormat = internalFormat;
+        glBaseInternalFormat = baseInternalFormat;
     }
 
     GLType getGLType() const { return (GLType)glType; }
@@ -304,6 +302,7 @@ struct KTXDescriptor {
     size_t getValueOffsetForKey(const std::string& key) const;
     size_t getImagesOffset() const;
     size_t evalStorageSize() const;
+    bool isValid() const;
 };
 
 
@@ -374,6 +373,7 @@ struct KTXDescriptor {
 
 #include <cassert>
 #include <algorithm>
+#include <unordered_set>
 
 namespace khronos { namespace ktx {
 
@@ -561,6 +561,486 @@ uint32_t KeyValue::serializedKeyValuesByteSize(const KeyValues& keyValues) {
     return keyValuesSize;
 }
 
+static const std::unordered_set<GLType> VALID_GL_TYPES {
+    GLType::UNSIGNED_BYTE,
+    GLType::BYTE,
+    GLType::UNSIGNED_SHORT,
+    GLType::SHORT,
+    GLType::UNSIGNED_INT,
+    GLType::INT,
+    GLType::HALF_FLOAT,
+    GLType::FLOAT,
+    GLType::UNSIGNED_BYTE_3_3_2,
+    GLType::UNSIGNED_BYTE_2_3_3_REV,
+    GLType::UNSIGNED_SHORT_5_6_5,
+    GLType::UNSIGNED_SHORT_5_6_5_REV,
+    GLType::UNSIGNED_SHORT_4_4_4_4,
+    GLType::UNSIGNED_SHORT_4_4_4_4_REV,
+    GLType::UNSIGNED_SHORT_5_5_5_1,
+    GLType::UNSIGNED_SHORT_1_5_5_5_REV,
+    GLType::UNSIGNED_INT_8_8_8_8,
+    GLType::UNSIGNED_INT_8_8_8_8_REV,
+    GLType::UNSIGNED_INT_10_10_10_2,
+    GLType::UNSIGNED_INT_2_10_10_10_REV,
+    GLType::UNSIGNED_INT_24_8,
+    GLType::UNSIGNED_INT_10F_11F_11F_REV,
+    GLType::UNSIGNED_INT_5_9_9_9_REV,
+    GLType::FLOAT_32_UNSIGNED_INT_24_8_REV,
+};
+
+static const std::unordered_set<GLFormat> VALID_GL_FORMATS {
+    GLFormat::STENCIL_INDEX,
+    GLFormat::DEPTH_COMPONENT,
+    GLFormat::DEPTH_STENCIL,
+    GLFormat::LUMINANCE,
+    GLFormat::RED,
+    GLFormat::GREEN,
+    GLFormat::BLUE,
+    GLFormat::RG,
+    GLFormat::RGB,
+    GLFormat::RGBA,
+    GLFormat::BGR,
+    GLFormat::BGRA,
+    GLFormat::RG_INTEGER,
+    GLFormat::RED_INTEGER,
+    GLFormat::GREEN_INTEGER,
+    GLFormat::BLUE_INTEGER,
+    GLFormat::RGB_INTEGER,
+    GLFormat::RGBA_INTEGER,
+    GLFormat::BGR_INTEGER,
+    GLFormat::BGRA_INTEGER,
+};
+
+static const std::unordered_set<GLInternalFormat> VALID_GL_INTERNAL_FORMATS {
+    GLInternalFormat::LUMINANCE8,
+    GLInternalFormat::R8,
+    GLInternalFormat::R8_SNORM,
+    GLInternalFormat::R16,
+    GLInternalFormat::R16_SNORM,
+    GLInternalFormat::RG8,
+    GLInternalFormat::RG8_SNORM,
+    GLInternalFormat::RG16,
+    GLInternalFormat::RG16_SNORM,
+    GLInternalFormat::R3_G3_B2,
+    GLInternalFormat::RGB4,
+    GLInternalFormat::RGB5,
+    GLInternalFormat::RGB565,
+    GLInternalFormat::RGB8,
+    GLInternalFormat::RGB8_SNORM,
+    GLInternalFormat::RGB10,
+    GLInternalFormat::RGB12,
+    GLInternalFormat::RGB16,
+    GLInternalFormat::RGB16_SNORM,
+    GLInternalFormat::RGBA2,
+    GLInternalFormat::RGBA4,
+    GLInternalFormat::RGB5_A1,
+    GLInternalFormat::RGBA8,
+    GLInternalFormat::RGBA8_SNORM,
+    GLInternalFormat::RGB10_A2,
+    GLInternalFormat::RGB10_A2UI,
+    GLInternalFormat::RGBA12,
+    GLInternalFormat::RGBA16,
+    GLInternalFormat::RGBA16_SNORM,
+    GLInternalFormat::SRGB8,
+    GLInternalFormat::SRGB8_ALPHA8,
+    GLInternalFormat::R16F,
+    GLInternalFormat::RG16F,
+    GLInternalFormat::RGB16F,
+    GLInternalFormat::RGBA16F,
+    GLInternalFormat::R32F,
+    GLInternalFormat::RG32F,
+    GLInternalFormat::RGBA32F,
+    GLInternalFormat::R11F_G11F_B10F,
+    GLInternalFormat::RGB9_E5,
+    GLInternalFormat::R8I,
+    GLInternalFormat::R8UI,
+    GLInternalFormat::R16I,
+    GLInternalFormat::R16UI,
+    GLInternalFormat::R32I,
+    GLInternalFormat::R32UI,
+    GLInternalFormat::RG8I,
+    GLInternalFormat::RG8UI,
+    GLInternalFormat::RG16I,
+    GLInternalFormat::RG16UI,
+    GLInternalFormat::RG32I,
+    GLInternalFormat::RG32UI,
+    GLInternalFormat::RGB8I,
+    GLInternalFormat::RGB8UI,
+    GLInternalFormat::RGB16I,
+    GLInternalFormat::RGB16UI,
+    GLInternalFormat::RGB32I,
+    GLInternalFormat::RGB32UI,
+    GLInternalFormat::RGBA8I,
+    GLInternalFormat::RGBA8UI,
+    GLInternalFormat::RGBA16I,
+    GLInternalFormat::RGBA16UI,
+    GLInternalFormat::RGBA32I,
+    GLInternalFormat::RGBA32UI,
+    GLInternalFormat::DEPTH_COMPONENT16,
+    GLInternalFormat::DEPTH_COMPONENT24,
+    GLInternalFormat::DEPTH_COMPONENT32,
+    GLInternalFormat::DEPTH_COMPONENT32F,
+    GLInternalFormat::DEPTH24_STENCIL8,
+    GLInternalFormat::DEPTH32F_STENCIL8,
+    GLInternalFormat::STENCIL_INDEX1,
+    GLInternalFormat::STENCIL_INDEX4,
+    GLInternalFormat::STENCIL_INDEX8,
+    GLInternalFormat::STENCIL_INDEX16,
+};
+
+static const std::unordered_set<GLInternalFormat> VALID_GL_INTERNAL_COMPRESSED_FORMATS {
+    GLInternalFormat::COMPRESSED_RED,
+    GLInternalFormat::COMPRESSED_RG,
+    GLInternalFormat::COMPRESSED_RGB,
+    GLInternalFormat::COMPRESSED_RGBA,
+    GLInternalFormat::COMPRESSED_SRGB,
+    GLInternalFormat::COMPRESSED_SRGB_ALPHA,
+    GLInternalFormat::COMPRESSED_ETC1_RGB8_OES,
+    GLInternalFormat::COMPRESSED_RGB_S3TC_DXT1_EXT,
+    GLInternalFormat::COMPRESSED_RGBA_S3TC_DXT3_EXT,
+    GLInternalFormat::COMPRESSED_SRGB_S3TC_DXT1_EXT,
+    GLInternalFormat::COMPRESSED_RGBA_S3TC_DXT1_EXT,
+    GLInternalFormat::COMPRESSED_RGBA_S3TC_DXT5_EXT,
+    GLInternalFormat::COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT,
+    GLInternalFormat::COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT,
+    GLInternalFormat::COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT,
+    GLInternalFormat::COMPRESSED_RED_RGTC1,
+    GLInternalFormat::COMPRESSED_SIGNED_RED_RGTC1,
+    GLInternalFormat::COMPRESSED_RG_RGTC2,
+    GLInternalFormat::COMPRESSED_SIGNED_RG_RGTC2,
+    GLInternalFormat::COMPRESSED_RGBA_BPTC_UNORM,
+    GLInternalFormat::COMPRESSED_SRGB_ALPHA_BPTC_UNORM,
+    GLInternalFormat::COMPRESSED_RGB_BPTC_SIGNED_FLOAT,
+    GLInternalFormat::COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT,
+    GLInternalFormat::COMPRESSED_RGB8_ETC2,
+    GLInternalFormat::COMPRESSED_SRGB8_ETC2,
+    GLInternalFormat::COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2,
+    GLInternalFormat::COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2,
+    GLInternalFormat::COMPRESSED_RGBA8_ETC2_EAC,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ETC2_EAC,
+    GLInternalFormat::COMPRESSED_R11_EAC,
+    GLInternalFormat::COMPRESSED_SIGNED_R11_EAC,
+    GLInternalFormat::COMPRESSED_RG11_EAC,
+    GLInternalFormat::COMPRESSED_SIGNED_RG11_EAC,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_4x4,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_5x4,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_5x5,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_6x5,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_6x6,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_8x5,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_8x6,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_8x8,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_10x5,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_10x6,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_10x8,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_10x10,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_12x10,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_12x12,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_3x3x3_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_4x3x3_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_4x4x3_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_4x4x4_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_5x4x4_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_5x5x4_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_5x5x5_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_6x5x5_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_6x6x5_OES,
+    GLInternalFormat::COMPRESSED_RGBA_ASTC_6x6x6_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_4x4,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_5x4,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_5x5,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_6x5,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_6x6,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_8x5,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_8x6,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_8x8,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_10x5,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_10x6,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_10x8,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_10x10,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_12x10,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_12x12,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_3x3x3_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_4x3x3_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x3_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x4_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_5x4x4_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x4_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x5_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_6x5x5_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x5_OES,
+    GLInternalFormat::COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x6_OES,
+};
+
+static const std::unordered_set<GLBaseInternalFormat> VALID_GL_BASE_INTERNAL_FORMATS {
+    GLBaseInternalFormat::DEPTH_COMPONENT,
+    GLBaseInternalFormat::DEPTH_STENCIL,
+    GLBaseInternalFormat::LUMINANCE,
+    GLBaseInternalFormat::RED,
+    GLBaseInternalFormat::RG,
+    GLBaseInternalFormat::RGB,
+    GLBaseInternalFormat::RGBA,
+    GLBaseInternalFormat::SRGB,
+    GLBaseInternalFormat::SRGB_ALPHA,
+    GLBaseInternalFormat::STENCIL_INDEX,
+};
+
+bool Header::isValid() const {
+    if (0 != memcmp(identifier, IDENTIFIER.data(), IDENTIFIER_LENGTH)) {
+        //qDebug() << "Invalid header identifier";
+        return false;
+    }
+
+    if (endianness != ENDIAN_TEST && endianness != REVERSE_ENDIAN_TEST) {
+        //qDebug("Invalid endian marker 0x%x", endianness);
+        return false;
+    }
+
+    //
+    // GL enum validity
+    //
+    if (VALID_GL_BASE_INTERNAL_FORMATS.count(glBaseInternalFormat) != 1) {
+        //qDebug("Invalid base internal format 0x%x", glBaseInternalFormat);
+        return false;
+    }
+
+    if (isCompressed()) {
+        if (glType != GLType::COMPRESSED) {
+            //qDebug("Invalid type for compressed texture 0x%x", glType);
+            return false;
+        }
+
+        if (glTypeSize != COMPRESSED_TYPE_SIZE) {
+            //qDebug("Invalid type size for compressed texture %d", glTypeSize);
+            return false;
+        }
+
+        if (VALID_GL_INTERNAL_COMPRESSED_FORMATS.count(glInternalFormat) != 1) {
+            //qDebug("Invalid compressed internal format 0x%x", glInternalFormat);
+            return false;
+        }
+    } else {
+        if (VALID_GL_TYPES.count(glType) != 1) {
+            //qDebug("Invalid type 0x%x", glType);
+            return false;
+        }
+
+        if (VALID_GL_FORMATS.count(glFormat) != 1) {
+            //qDebug("Invalid format 0x%x", glFormat);
+            return false;
+        }
+
+        if (VALID_GL_INTERNAL_FORMATS.count(glInternalFormat) != 1) {
+            //qDebug("Invalid internal format 0x%x", glInternalFormat);
+            return false;
+        }
+    }
+
+    //
+    // Dimensions validity
+    //
+
+    // Textures must at least have a width
+    // If they have a depth, they must have a height
+    if ((pixelWidth == 0) || (pixelDepth != 0 && pixelHeight == 0)) {
+        //qDebug() << "Invalid dimensions " << pixelWidth << "x" << pixelHeight << "x" << pixelDepth;
+        return false;
+    }
+
+
+    if (numberOfFaces != 1 && numberOfFaces != NUM_CUBEMAPFACES) {
+        //qDebug() << "Invalid number of faces " << numberOfFaces;
+        return false;
+    }
+
+    // FIXME validate numberOfMipmapLevels based on the dimensions?
+
+    if ((bytesOfKeyValueData % 4) != 0) {
+        //qDebug() << "Invalid keyvalue data size " << bytesOfKeyValueData;
+        return false;
+    }
+
+    return true;
+}
+
+struct AlignedStreamBuffer {
+    AlignedStreamBuffer(size_t size, const uint8_t* data) 
+        : _size(size), _data(data) { }
+
+    AlignedStreamBuffer(const StoragePtr& storage) 
+        : AlignedStreamBuffer(storage->size(), storage->data()) { }
+
+
+    template<typename T>
+    bool read(T& t) {
+        // Ensure we don't read more than we have
+        if (sizeof(T) > _size) {
+            return false;
+        }
+
+        // Grab the data
+        memcpy(&t, _data, sizeof(T));
+
+        // Advance the pointer
+        return skip(sizeof(T));
+    }
+
+    bool skip(size_t skipSize) {
+        skipSize = ::khronos::ktx::evalPaddedSize(skipSize);
+        if (skipSize > _size) {
+            return false;
+        }
+        _data += skipSize;
+        _size -= skipSize;
+        return true;
+    }
+
+    AlignedStreamBuffer front(size_t size) const {
+        return AlignedStreamBuffer { std::min(size, _size), _data };
+    }
+
+    bool empty() const {
+        return _size == 0;
+    }
+
+private:
+    size_t _size;
+    const uint8_t* _data;
+};
+
+bool validateKeyValueData(AlignedStreamBuffer kvbuffer) {
+    while (!kvbuffer.empty()) {
+        uint32_t keyValueSize;
+        // Try to fetch the size of the next key value block
+        if (!kvbuffer.read(keyValueSize)) {
+            //qDebug() << "Unable to read past key value size";
+            return false;
+        }
+        if (!kvbuffer.skip(keyValueSize)) {
+            //qDebug() << "Unable to skip past key value data";
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool KTXDescriptor::validate(const StoragePtr& src) {
+    if (!checkAlignment(src->size())) {
+        // All KTX data is 4-byte aligned
+        //qDebug() << "Invalid size, not 4 byte aligned";
+        return false;
+    }
+
+    Header header;
+    AlignedStreamBuffer buffer { src };
+    if (!buffer.read(header)) {
+        //qDebug() << "Unable to read header";
+        return false;
+    }
+
+    // Basic header validation, are the enums and size valid?
+    if (!header.isValid()) {
+        //qDebug() << "Invalid header";
+        return false;
+    }
+
+    // Validate the key value pairs
+    if (!validateKeyValueData(buffer.front(header.bytesOfKeyValueData))) {
+        //qDebug() << "Invalid key value data";
+        return false;
+    }
+
+    // now skip the KV data
+    if (!buffer.skip(header.bytesOfKeyValueData)) {
+        //qDebug() << "Unable to read past key value data";
+        return false;
+    }
+
+
+    // Validate the images
+    for (uint32_t mip = 0; mip < header.numberOfMipmapLevels; ++mip) {
+        uint32_t imageSize;
+        if (!buffer.read(imageSize)) {
+            //qDebug() << "Unable to read image size";
+            return false;
+        }
+
+        uint32_t arrayElements = header.numberOfArrayElements == 0 ? 1 : header.numberOfArrayElements;
+        for (uint32_t arrayElement = 0; arrayElement < arrayElements; ++arrayElement) {
+            for (uint8_t face = 0; face < header.numberOfFaces; ++face) {
+                if (!buffer.skip(imageSize)) {
+                    //qDebug() << "Unable to skip past image data";
+                    return false;
+                }
+            }
+        }
+    }
+
+    // The buffer should be empty afer we've skipped all of the KTX data
+    if (!buffer.empty()) {
+        return false;
+    }
+
+    return true;
+}
+
+
+
+bool KTXDescriptor::isValid() const {
+    if (!header.isValid()) {
+        return false;
+    }
+
+    if (images.size() != header.numberOfMipmapLevels) {
+        return false;
+    }
+
+    // FIXME, do key value checks?
+
+
+
+    for (uint8_t mip = 0; mip < header.numberOfMipmapLevels; ++mip) {
+        for (uint8_t face = 0; face < header.numberOfFaces; ++face) {
+            auto faceOffset = getMipFaceTexelsOffset(mip, face);
+            // The face start offset must be 4 byte aligned
+            if (!checkAlignment(faceOffset)) {
+                return false;
+            }
+
+            // The face size must be 4 byte aligned
+            auto faceSize = getMipFaceTexelsSize(mip, face);
+            if (!checkAlignment(faceSize)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+size_t KTXDescriptor::getMipFaceTexelsSize(uint16_t mip, uint8_t face) const {
+    size_t result{ 0 };
+    if (mip < images.size()) {
+        const auto& faces = images[mip];
+        if (face < faces._numFaces) {
+            result = faces._faceSize;
+        }
+    }
+    return result;
+}
+
+size_t KTXDescriptor::getMipFaceTexelsOffset(uint16_t mip, uint8_t face) const {
+    size_t result{ 0 };
+    if (mip < images.size()) {
+        const auto& faces = images[mip];
+        if (face < faces._numFaces) {
+            result = faces._faceOffsets[face];
+        }
+    }
+    return result;
+}
+
 #if 0
 void KTX::resetStorage(const StoragePointer& storage) {
     _storage = storage;
@@ -606,28 +1086,6 @@ storage::StoragePointer KTX::getMipFaceTexelsData(uint16_t mip, uint8_t face) co
             auto faceOffset = faces._faceBytes[face] - _storage->data();
             auto faceSize = faces._faceSize;
             result = _storage->createView(faceSize, faceOffset);
-        }
-    }
-    return result;
-}
-
-size_t KTXDescriptor::getMipFaceTexelsSize(uint16_t mip, uint8_t face) const {
-    size_t result{ 0 };
-    if (mip < images.size()) {
-        const auto& faces = images[mip];
-        if (face < faces._numFaces) {
-            result = faces._faceSize;
-        }
-    }
-    return result;
-}
-
-size_t KTXDescriptor::getMipFaceTexelsOffset(uint16_t mip, uint8_t face) const {
-    size_t result{ 0 };
-    if (mip < images.size()) {
-        const auto& faces = images[mip];
-        if (face < faces._numFaces) {
-            result = faces._faceOffsets[face];
         }
     }
     return result;

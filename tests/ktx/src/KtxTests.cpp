@@ -10,10 +10,31 @@
 #define KHR_UTILS_STORAGE_IMPLEMENTATION
 #include <khr/ktx/ktx.hpp>
 
+#include <mutex>
+#include <string>
+#include <iostream>
+#include <filesystem>
 
 #include <gtest/gtest.h>
-#include <mutex>
 
+namespace fs {
+    using namespace std::filesystem;
+}
+
+const fs::path& getResourcePath() {
+    static const fs::path RESOURCE_PATH = fs::path(__FILE__"/../../../../external/ktx/tests/testimages").lexically_normal();
+    return RESOURCE_PATH;
+}
+
+std::vector<fs::path> getTestFiles() {
+    std::vector<fs::path> result;
+    for (const auto& p : fs::directory_iterator(getResourcePath())) {
+        if (p.is_regular_file() && p.path().extension() == ".ktx") {
+            result.push_back(p.path());
+        }
+    }
+    return result;
+}
 
 class KtxTest : public ::testing::Test {
 protected:
@@ -68,6 +89,31 @@ TEST_F(KtxTest, testKhronosCompressionFunctions) {
     } catch (const std::runtime_error&) {
         ASSERT_TRUE(true);
     }
+}
+
+TEST_F(KtxTest, testValidation) {
+    using namespace khronos;
+    const auto testFiles = getTestFiles();
+    size_t invalid = 0;
+    for (const auto& file : testFiles) {
+        auto storage = khr::utils::Storage::readFile(file.string());
+        auto valid = ktx::KTXDescriptor::validate(storage);
+        if (!valid) {
+            std::cerr << "Invalid " << file << std::endl;
+            ++invalid;
+        }
+        ASSERT_TRUE(true);
+    }
+
+    std::cerr << invalid << std::endl;
+
+    //namespace fs = std::filesystem;
+    //int main()
+    //{
+    //    std::string path = "/path/to/directory";
+    //    for (const auto & p : fs::directory_iterator(path))
+    //        std::cout << p << std::endl; // "p" is the directory entry. Get the path with "p.path()".
+    //}
 }
 
 TEST_F(KtxTest, testKtxSerialization) {

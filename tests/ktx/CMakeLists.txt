@@ -1,15 +1,5 @@
 set(TARGET_NAME "ktx-test")
-project(${TARGET_NAME})
-file(GLOB TARGET_SRCS src/*)
-add_executable(${TARGET_NAME} ${TARGET_SRCS})
-set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "tests")
+khrpp_add_test()
 
+# Needs EGL includes
 target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/external/egl/api)
-target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_include_directories(${TARGET_NAME} PRIVATE ${GTEST_INCLUDE_DIRS})
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::GTest GTest::Main)
-gtest_add_tests(TARGET ${TARGET_NAME} AUTO)
-# add_executable(tests tests.cpp)
-# gtest_add_tests(TARGET tests TEST_PREFIX old:)
-# gtest_discover_tests(tests TEST_PREFIX new:)
-# add_test(NAME monolithic COMMAND tests)

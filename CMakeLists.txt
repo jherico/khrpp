@@ -9,46 +9,13 @@ include("cmake/init.cmake")
 
 include("cmake/compiler.cmake")
 
-set(BUILD_CLIENT_OPTION ON)
-set(BUILD_SERVER_OPTION ON)
-set(BUILD_TESTS_OPTION ON)
-set(BUILD_TOOLS_OPTION ON)
-set(BUILD_INSTALLER_OPTION ON)
-set(GLES_OPTION OFF)
-set(DISABLE_QML_OPTION OFF)
-set(DOWNLOAD_SERVERLESS_CONTENT_OPTION OFF)
-
-if (ANDROID OR UWP)
-  set(BUILD_SERVER_OPTION OFF)
-  set(BUILD_TOOLS_OPTION OFF)
-  set(BUILD_INSTALLER OFF)
-endif()
-
-if (CLIENT_ONLY)
-  set(BUILD_SERVER_OPTION OFF)
-endif()
-
-if (SERVER_ONLY)
-  set(BUILD_CLIENT_OPTION OFF)
-  set(BUILD_TESTS_OPTION OFF)
-endif()
-
-if (ANDROID)
-  set(GLES_OPTION ON)
-  set(PLATFORM_QT_COMPONENTS AndroidExtras WebView)
-else ()
-  set(PLATFORM_QT_COMPONENTS WebEngine WebEngineWidgets)
-endif ()
-
-if (USE_GLES AND (NOT ANDROID))
-  set(DISABLE_QML_OPTION ON)
-endif()
-
 option(BUILD_TESTS "Build tests" ON)
-option(BUILD_INSTALLER "Build installer" OFF)
+option(BUILD_TOOLS "Build tools" ON)
+#option(BUILD_INSTALLER "Build installer" OFF)
 
 MESSAGE(STATUS "Build tests:           " ${BUILD_TESTS})
-MESSAGE(STATUS "Build installer:       " ${BUILD_INSTALLER})
+MESSAGE(STATUS "Build tools:           " ${BUILD_TOOLS})
+#MESSAGE(STATUS "Build installer:       " ${BUILD_INSTALLER})
 
 #
 # Helper projects
@@ -63,17 +30,15 @@ add_custom_target(khr SOURCES ${KHR_SRC})
 GroupSources("khr")
 unset(KHR_SRC)
 
-
 find_package(Threads)
 
 set(EXTERNAL_PROJECT_PREFIX "project")
 set_property(DIRECTORY PROPERTY EP_PREFIX ${EXTERNAL_PROJECT_PREFIX})
 setup_externals_binary_dir()
 
-if (BUILD_CLIENT OR BUILD_SERVER)
-  add_subdirectory(plugins)
+if (BUILD_TOOLS)
+  add_subdirectory(tools)
 endif()
-
 
 if (BUILD_TESTS)
     include(CTest)

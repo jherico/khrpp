@@ -1,6 +1,5 @@
 macro(TARGET_GLM)
-    add_dependency_external_projects(glm)
-    add_dependencies(${TARGET_NAME} glm)
-    target_include_directories(${TARGET_NAME} PUBLIC ${GLM_INCLUDE_DIRS})
+    target_compile_definitions(${TARGET_NAME} PRIVATE GLM_FORCE_RADIANS)
+    target_compile_definitions(${TARGET_NAME} PRIVATE KHRPP_USE_GLM)
+    target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/external/glm)
 endmacro()
-

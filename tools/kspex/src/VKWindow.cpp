@@ -9,6 +9,7 @@
 #include "VKWindow.h"
 #include <QtGui/qevent.h>
 #include <QtCore/QTimer>
+#include <khr/vks/renderpass.hpp>
 
 VKWindow::VKWindow(QScreen* screen) : QWindow(screen) {
     _resizeTimer = new QTimer(this);

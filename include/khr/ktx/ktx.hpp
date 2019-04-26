@@ -17,6 +17,9 @@
 #include <cstring>
 #include <string>
 #include <memory>
+#include <cassert>
+#include <algorithm>
+#include <unordered_set>
 
 #include "../constants.hpp"
 #include "../utils/storage.hpp"
@@ -122,7 +125,11 @@ struct Header {
     static const uint32_t COMPRESSED_TYPE_SIZE{ 1 };
     static const size_t IDENTIFIER_LENGTH{ 12 };
     using Identifier = std::array<uint8_t, IDENTIFIER_LENGTH>;
-    static const Identifier IDENTIFIER;
+
+    static const Identifier& IDENTIFIER() {
+        static const Identifier IDENTIFIER_VALUE{ { 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A } };
+        return IDENTIFIER_VALUE;
+   };
 
     static const uint32_t ENDIAN_TEST = 0x04030201;
     static const uint32_t REVERSE_ENDIAN_TEST = 0x01020304;
@@ -132,7 +139,7 @@ struct Header {
     Byte identifier[IDENTIFIER_LENGTH];
     uint32_t endianness{ ENDIAN_TEST };
 
-    GLType glType{ static_cast<uint32_t>(GLType::UNSIGNED_BYTE) };
+    GLType glType{ GLType::UNSIGNED_BYTE };
     uint32_t glTypeSize{ 0 };
     GLFormat glFormat{ GLFormat::RGBA };
     GLInternalFormat glInternalFormat{ GLInternalFormat::RGBA8 };
@@ -167,62 +174,18 @@ struct Header {
     size_t evalUnalignedFaceSize(uint32_t level) const;
     size_t evalImageSize(uint32_t level) const;
 
-    // FIXME base internal format should automatically be determined by internal format
-    // FIXME type size should automatically be determined by type
-    void setUncompressed(GLType type, uint32_t typeSize, GLFormat format, GLInternalFormat internalFormat, GLBaseInternalFormat baseInternalFormat) {
-        glType = type;
-        glTypeSize = typeSize;
-        glFormat = format;
-        glInternalFormat = internalFormat;
-        glBaseInternalFormat = baseInternalFormat;
-    }
-
-    // FIXME base internal format should automatically be determined by internal format
-    void setCompressed(GLInternalFormat internalFormat, GLBaseInternalFormat baseInternalFormat) {
-        glType = GLType::COMPRESSED;
-        glFormat = GLFormat::COMPRESSED;
-        glTypeSize = COMPRESSED_TYPE_SIZE;
-        glInternalFormat = internalFormat;
-        glBaseInternalFormat = baseInternalFormat;
-    }
-
-    GLType getGLType() const { return (GLType)glType; }
+    GLType getGLType() const { return glType; }
     uint32_t getTypeSize() const { return glTypeSize; }
     GLFormat getGLFormat() const { return (GLFormat)glFormat; }
     GLInternalFormat getGLInternaFormat() const { return (GLInternalFormat)glInternalFormat; }
     GLBaseInternalFormat getGLBaseInternalFormat() const { return (GLBaseInternalFormat)glBaseInternalFormat; }
 
-    void set1D(uint32_t width) { setDimensions(width); }
-    void set1DArray(uint32_t width, uint32_t numSlices) { setDimensions(width, 0, 0, (numSlices > 0 ? numSlices : 1)); }
-    void set2D(uint32_t width, uint32_t height) { setDimensions(width, height); }
-    void set2DArray(uint32_t width, uint32_t height, uint32_t numSlices) { setDimensions(width, height, 0, (numSlices > 0 ? numSlices : 1)); }
-    void set3D(uint32_t width, uint32_t height, uint32_t depth) { setDimensions(width, height, depth); }
-    void set3DArray(uint32_t width, uint32_t height, uint32_t depth, uint32_t numSlices) {
-        setDimensions(width, height, depth, (numSlices > 0 ? numSlices : 1));
-    }
-    void setCube(uint32_t width, uint32_t height) { setDimensions(width, height, 0, 0, NUM_CUBEMAPFACES); }
-    void setCubeArray(uint32_t width, uint32_t height, uint32_t numSlices) {
-        setDimensions(width, height, 0, (numSlices > 0 ? numSlices : 1), NUM_CUBEMAPFACES);
-    }
-
     bool isValid() const;
-
-    // Generate a set of image descriptors based on the assumption that the full mip pyramid is populated
-    ImageDescriptors generateImageDescriptors() const;
 
 private:
     uint32_t evalPixelOrBlockDimension(uint32_t pixelDimension) const;
     uint32_t evalMipPixelOrBlockDimension(uint32_t level, uint32_t pixelDimension) const;
-
     static inline uint32_t evalMipDimension(uint32_t mipLevel, uint32_t pixelDimension) { return std::max(pixelDimension >> mipLevel, 1U); }
-
-    void setDimensions(uint32_t width, uint32_t height = 0, uint32_t depth = 0, uint32_t numSlices = 0, uint32_t numFaces = 1) {
-        pixelWidth = (width > 0 ? width : 1);
-        pixelHeight = height;
-        pixelDepth = depth;
-        numberOfArrayElements = numSlices;
-        numberOfFaces = numFaces;
-    }
 };
 
 // Size as specified by the KTX specification
@@ -233,6 +196,7 @@ static const size_t IMAGE_SIZE_WIDTH{ ALIGNMENT };  // Number of bytes for image
 
 // Key Values
 struct KeyValue {
+    using List = std::list<KeyValue>;
     uint32_t _byteSize{ 0 };
     std::string _key;
     std::vector<Byte> _value;
@@ -245,12 +209,10 @@ struct KeyValue {
 
     static KeyValue parseSerializedKeyAndValue(uint32_t srcSize, const Byte* srcBytes);
     static uint32_t writeSerializedKeyAndValue(Byte* destBytes, uint32_t destByteSize, const KeyValue& keyval);
-
-    using KeyValues = std::list<KeyValue>;
-    static uint32_t serializedKeyValuesByteSize(const KeyValues& keyValues);
+    static uint32_t serializedKeyValuesByteSize(const List& keyValues);
 };
 
-using KeyValues = KeyValue::KeyValues;
+using KeyValues = KeyValue::List;
 
 struct ImageHeader {
     using Offsets = std::vector<size_t>;
@@ -284,16 +246,12 @@ struct ImageDescriptor : public ImageHeader {
 // actual image / face data available.
 struct KTXDescriptor {
     static bool validate(const StoragePtr& src);
-    static size_t evalStorageSize(const Header& header, const ImageDescriptors& images, const KeyValues& keyValues = {});
+    static std::shared_ptr<const KTXDescriptor> read(const StoragePtr& src);
 
     KTXDescriptor(const Header& header, const ImageDescriptors& imageDescriptors, const KeyValues& keyValues = {})
         : header(header)
         , keyValues(keyValues)
         , images(imageDescriptors) {}
-    KTXDescriptor(const Header& header, const KeyValues& keyValues = {})
-        : header(header)
-        , keyValues(keyValues)
-        , images(header.generateImageDescriptors()) {}
     const Header header;
     const KeyValues keyValues;
     const ImageDescriptors images;
@@ -305,113 +263,43 @@ struct KTXDescriptor {
     bool isValid() const;
 };
 
-
-#if 0
-    // Define a KTX object manually to write it somewhere (in a file on disk?)
-    // This path allocate the Storage where to store header, keyvalues and copy mips
-    // Then COPY all the data
-    static StoragePointer create(const Header& header, const Images& images, const KeyValues& keyValues = {});
-    static StoragePointer createBare(const Header& header, const KeyValues& keyValues = {});
-
-    // Instead of creating a full Copy of the src data in a KTX object, the write serialization can be performed with the
-    // following two functions
-    //   size_t sizeNeeded = KTX::evalStorageSize(header, images);
-    //
-    //   //allocate a buffer of size "sizeNeeded" or map a file with enough capacity
-    //   Byte* destBytes = new Byte[sizeNeeded];
-    //
-    //   // THen perform the writing of the src data to the destinnation buffer
-    //   write(destBytes, sizeNeeded, header, images);
-    //
-    // This is exactly what is done in the create function
-    static size_t evalStorageSize(const Header& header, const Images& images, const KeyValues& keyValues = KeyValues());
-    static size_t write(Byte* destBytes, size_t destByteSize, const Header& header, const Images& images, const KeyValues& keyValues = KeyValues());
-    static size_t writeWithoutImages(Byte* destBytes,
-                                     size_t destByteSize,
-                                     const Header& header,
-                                     const ImageDescriptors& descriptors,
-                                     const KeyValues& keyValues = KeyValues());
-    static size_t writeKeyValues(Byte* destBytes, size_t destByteSize, const KeyValues& keyValues);
-    static Images writeImages(Byte* destBytes, size_t destByteSize, const Images& images);
-
-    void writeMipData(uint16_t level, const Byte* sourceBytes, size_t source_size);
-
-    // Parse a block of memory and create a KTX object from it
-    static std::unique_ptr<KTX> create(const StoragePointer& src);
-
-    static bool checkHeaderFromStorage(size_t srcSize, const Byte* srcBytes);
-    static KeyValues parseKeyValues(size_t srcSize, const Byte* srcBytes);
-    static Images parseImages(const Header& header, size_t srcSize, const Byte* srcBytes);
-
-    // Access raw pointers to the main sections of the KTX
-    const Header& getHeader() const;
-
-    const Byte* getKeyValueData() const;
-    const Byte* getTexelsData() const;
-    size_t getTexelsOffset() const { return getTexelsData() - (Byte*)&getHeader(); }
-    storage::StoragePointer getMipFaceTexelsData(uint16_t mip = 0, uint8_t face = 0) const;
-    const StoragePointer& getStorage() const { return _storage; }
-
-    KTXDescriptor toDescriptor() const;
-    size_t getKeyValueDataSize() const;
-    size_t getTexelsDataSize() const;
-    bool isValid() const;
-
-    Header _header;
-    StoragePointer _storage;
-    KeyValues _keyValues;
-    Images _images;
-
-    friend struct KTXDescriptor;
-};
-#endif
-
-
 }}  // namespace khronos::ktx
 
-//#ifdef KHR_KTX_IMPLEMENTATION
-
-#include <cassert>
-#include <algorithm>
-#include <unordered_set>
 
 namespace khronos { namespace ktx {
 
-const Header::Identifier Header::IDENTIFIER{ { 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A } };
-
-Header::Header() {
-    memcpy(identifier, IDENTIFIER.data(), IDENTIFIER_LENGTH);
+inline Header::Header() {
 }
 
-uint32_t Header::evalMaxDimension() const {
+inline uint32_t Header::evalMaxDimension() const {
     return std::max(getPixelWidth(), std::max(getPixelHeight(), getPixelDepth()));
 }
 
-uint32_t Header::evalPixelOrBlockDimension(uint32_t pixelDimension) const {
+inline uint32_t Header::evalPixelOrBlockDimension(uint32_t pixelDimension) const {
     if (isCompressed()) {
         return khronos::gl::texture::evalCompressedBlockCount(getGLInternaFormat(), pixelDimension);
     }
     return pixelDimension;
 }
 
-uint32_t Header::evalMipPixelOrBlockDimension(uint32_t mipLevel, uint32_t pixelDimension) const {
+inline uint32_t Header::evalMipPixelOrBlockDimension(uint32_t mipLevel, uint32_t pixelDimension) const {
     uint32_t mipPixelDimension = evalMipDimension(mipLevel, pixelDimension);
     return evalPixelOrBlockDimension(mipPixelDimension);
 }
 
-uint32_t Header::evalPixelOrBlockWidth(uint32_t level) const {
+inline uint32_t Header::evalPixelOrBlockWidth(uint32_t level) const {
     return evalMipPixelOrBlockDimension(level, getPixelWidth());
 }
 
-uint32_t Header::evalPixelOrBlockHeight(uint32_t level) const {
+inline uint32_t Header::evalPixelOrBlockHeight(uint32_t level) const {
     return evalMipPixelOrBlockDimension(level, getPixelHeight());
 }
 
-uint32_t Header::evalPixelOrBlockDepth(uint32_t level) const {
+inline uint32_t Header::evalPixelOrBlockDepth(uint32_t level) const {
     return evalMipDimension(level, getPixelDepth());
 }
 
-size_t Header::evalPixelOrBlockBitSize() const {
+inline size_t Header::evalPixelOrBlockBitSize() const {
     size_t result = 0;
     auto format = getGLInternaFormat();
     if (isCompressed()) {
@@ -426,7 +314,7 @@ size_t Header::evalPixelOrBlockBitSize() const {
     return result;
 }
 
-size_t Header::evalUnalignedRowSize(uint32_t level) const {
+inline size_t Header::evalUnalignedRowSize(uint32_t level) const {
     auto pixWidth = evalPixelOrBlockWidth(level);
     auto pixSize = evalPixelOrBlockBitSize();
     if (pixSize == 0) {
@@ -437,25 +325,25 @@ size_t Header::evalUnalignedRowSize(uint32_t level) const {
     return totalByteSize = (totalByteSize / 8) + (((totalByteSize % 8) != 0) & 1);
 }
 
-size_t Header::evalRowSize(uint32_t level) const {
+inline size_t Header::evalRowSize(uint32_t level) const {
     return evalPaddedSize(evalUnalignedRowSize(level));
 }
 
-size_t Header::evalUnalignedFaceSize(uint32_t level) const {
+inline size_t Header::evalUnalignedFaceSize(uint32_t level) const {
     auto pixHeight = evalPixelOrBlockHeight(level);
     auto pixDepth = evalPixelOrBlockDepth(level);
     auto rowSize = evalUnalignedRowSize(level);
     return pixDepth * pixHeight * rowSize;
 }
 
-size_t Header::evalFaceSize(uint32_t level) const {
+inline size_t Header::evalFaceSize(uint32_t level) const {
     auto pixHeight = evalPixelOrBlockHeight(level);
     auto pixDepth = evalPixelOrBlockDepth(level);
     auto rowSize = evalRowSize(level);
     return pixDepth * pixHeight * rowSize;
 }
 
-size_t Header::evalImageSize(uint32_t level) const {
+inline size_t Header::evalImageSize(uint32_t level) const {
     auto faceSize = evalFaceSize(level);
     if (!checkAlignment(faceSize)) {
         return 0;
@@ -467,7 +355,7 @@ size_t Header::evalImageSize(uint32_t level) const {
     }
 }
 
-size_t KTXDescriptor::getValueOffsetForKey(const std::string& key) const {
+inline size_t KTXDescriptor::getValueOffsetForKey(const std::string& key) const {
     size_t offset{ 0 };
     for (auto& kv : keyValues) {
         if (kv._key == key) {
@@ -478,7 +366,7 @@ size_t KTXDescriptor::getValueOffsetForKey(const std::string& key) const {
     return 0;
 }
 
-size_t KTXDescriptor::getImagesOffset() const {
+inline size_t KTXDescriptor::getImagesOffset() const {
     size_t offset = sizeof(Header);
 
     if (!keyValues.empty()) {
@@ -489,7 +377,7 @@ size_t KTXDescriptor::getImagesOffset() const {
     return offset;
 }
 
-size_t KTXDescriptor::evalStorageSize() const {
+inline size_t KTXDescriptor::evalStorageSize() const {
     size_t storageSize = sizeof(Header);
 
     if (!keyValues.empty()) {
@@ -507,34 +395,8 @@ size_t KTXDescriptor::evalStorageSize() const {
     return storageSize;
 }
 
-ImageDescriptors Header::generateImageDescriptors() const {
-    ImageDescriptors descriptors;
 
-    size_t imageOffset = 0;
-    for (uint32_t level = 0; level < numberOfMipmapLevels; ++level) {
-        auto imageSize = static_cast<uint32_t>(evalImageSize(level));
-        if (!checkAlignment(imageSize)) {
-            return ImageDescriptors();
-        }
-        if (imageSize == 0) {
-            return ImageDescriptors();
-        }
-        ImageHeader header{ numberOfFaces == NUM_CUBEMAPFACES, imageOffset, imageSize, 0 };
-
-        imageOffset += (imageSize * numberOfFaces) + ktx::IMAGE_SIZE_WIDTH;
-
-        ImageHeader::Offsets offsets;
-        // TODO Add correct face offsets
-        for (uint32_t i = 0; i < numberOfFaces; ++i) {
-            offsets.push_back(0);
-        }
-        descriptors.push_back(ImageDescriptor(header, offsets));
-    }
-
-    return descriptors;
-}
-
-KeyValue::KeyValue(const std::string& key, uint32_t valueByteSize, const Byte* value)
+inline KeyValue::KeyValue(const std::string& key, uint32_t valueByteSize, const Byte* value)
     : _byteSize((uint32_t)key.size() + 1 + valueByteSize)
     ,  // keyString size + '\0' ending char + the value size
     _key(key)
@@ -544,15 +406,15 @@ KeyValue::KeyValue(const std::string& key, uint32_t valueByteSize, const Byte* v
     }
 }
 
-KeyValue::KeyValue(const std::string& key, const std::string& value)
+inline KeyValue::KeyValue(const std::string& key, const std::string& value)
     : KeyValue(key, (uint32_t)value.size(), (const Byte*)value.data()) {
 }
 
-uint32_t KeyValue::serializedByteSize() const {
+inline uint32_t KeyValue::serializedByteSize() const {
     return (uint32_t)sizeof(uint32_t) + evalPaddedSize(_byteSize);
 }
 
-uint32_t KeyValue::serializedKeyValuesByteSize(const KeyValues& keyValues) {
+inline uint32_t KeyValue::serializedKeyValuesByteSize(const KeyValues& keyValues) {
     uint32_t keyValuesSize = 0;
     for (auto& keyval : keyValues) {
         keyValuesSize += keyval.serializedByteSize();
@@ -785,8 +647,8 @@ static const std::unordered_set<GLBaseInternalFormat> VALID_GL_BASE_INTERNAL_FOR
     GLBaseInternalFormat::STENCIL_INDEX,
 };
 
-bool Header::isValid() const {
-    if (0 != memcmp(identifier, IDENTIFIER.data(), IDENTIFIER_LENGTH)) {
+inline bool Header::isValid() const {
+    if (0 != memcmp(identifier, IDENTIFIER().data(), IDENTIFIER_LENGTH)) {
         //qDebug() << "Invalid header identifier";
         return false;
     }
@@ -865,7 +727,7 @@ bool Header::isValid() const {
 
 struct AlignedStreamBuffer {
     AlignedStreamBuffer(size_t size, const uint8_t* data) 
-        : _size(size), _data(data) { }
+        : _size(size), _data(data), _start(_data) { }
 
     AlignedStreamBuffer(const StoragePtr& storage) 
         : AlignedStreamBuffer(storage->size(), storage->data()) { }
@@ -883,6 +745,10 @@ struct AlignedStreamBuffer {
 
         // Advance the pointer
         return skip(sizeof(T));
+    }
+
+    size_t offset() const {
+        return _data - _start;
     }
 
     bool skip(size_t skipSize) {
@@ -906,9 +772,10 @@ struct AlignedStreamBuffer {
 private:
     size_t _size;
     const uint8_t* _data;
+    const uint8_t* const _start;
 };
 
-bool validateKeyValueData(AlignedStreamBuffer kvbuffer) {
+static bool validateKeyValueData(AlignedStreamBuffer kvbuffer) {
     while (!kvbuffer.empty()) {
         uint32_t keyValueSize;
         // Try to fetch the size of the next key value block
@@ -925,7 +792,43 @@ bool validateKeyValueData(AlignedStreamBuffer kvbuffer) {
     return true;
 }
 
-bool KTXDescriptor::validate(const StoragePtr& src) {
+inline std::shared_ptr<const KTXDescriptor> KTXDescriptor::read(const StoragePtr& src) {
+    if (!src || !validate(src)) {
+        return nullptr;
+    }
+
+    Header header;
+    AlignedStreamBuffer buffer { src };
+    buffer.read(header);
+
+    auto kvbuffer = buffer.front(header.bytesOfKeyValueData);
+    buffer.skip(header.bytesOfKeyValueData);
+
+    ImageDescriptors images;
+
+    // Validate the images
+    for (uint32_t mip = 0; mip < header.numberOfMipmapLevels; ++mip) {
+        uint32_t imageSize;
+        buffer.read(imageSize);
+        size_t imageOffset = buffer.offset();
+
+        ImageHeader imageHeader{ header.numberOfFaces == 6, buffer.offset(), imageSize, 0 };
+
+        ImageHeader::Offsets faceOffsets;
+        uint32_t arrayElements = header.numberOfArrayElements == 0 ? 1 : header.numberOfArrayElements;
+        for (uint32_t arrayElement = 0; arrayElement < arrayElements; ++arrayElement) {
+            for (uint8_t face = 0; face < header.numberOfFaces; ++face) {
+                faceOffsets.push_back(buffer.offset());
+                buffer.skip(imageSize);
+            }
+        }
+        images.push_back({ imageHeader, faceOffsets });
+    }
+
+    return std::make_shared<KTXDescriptor>(header, images);
+}
+
+inline bool KTXDescriptor::validate(const StoragePtr& src) {
     if (!checkAlignment(src->size())) {
         // All KTX data is 4-byte aligned
         //qDebug() << "Invalid size, not 4 byte aligned";
@@ -987,7 +890,7 @@ bool KTXDescriptor::validate(const StoragePtr& src) {
 
 
 
-bool KTXDescriptor::isValid() const {
+inline bool KTXDescriptor::isValid() const {
     if (!header.isValid()) {
         return false;
     }
@@ -997,8 +900,6 @@ bool KTXDescriptor::isValid() const {
     }
 
     // FIXME, do key value checks?
-
-
 
     for (uint8_t mip = 0; mip < header.numberOfMipmapLevels; ++mip) {
         for (uint8_t face = 0; face < header.numberOfFaces; ++face) {
@@ -1019,7 +920,7 @@ bool KTXDescriptor::isValid() const {
     return true;
 }
 
-size_t KTXDescriptor::getMipFaceTexelsSize(uint16_t mip, uint8_t face) const {
+inline size_t KTXDescriptor::getMipFaceTexelsSize(uint16_t mip, uint8_t face) const {
     size_t result{ 0 };
     if (mip < images.size()) {
         const auto& faces = images[mip];
@@ -1030,7 +931,7 @@ size_t KTXDescriptor::getMipFaceTexelsSize(uint16_t mip, uint8_t face) const {
     return result;
 }
 
-size_t KTXDescriptor::getMipFaceTexelsOffset(uint16_t mip, uint8_t face) const {
+inline size_t KTXDescriptor::getMipFaceTexelsOffset(uint16_t mip, uint8_t face) const {
     size_t result{ 0 };
     if (mip < images.size()) {
         const auto& faces = images[mip];
@@ -1041,94 +942,5 @@ size_t KTXDescriptor::getMipFaceTexelsOffset(uint16_t mip, uint8_t face) const {
     return result;
 }
 
-#if 0
-void KTX::resetStorage(const StoragePointer& storage) {
-    _storage = storage;
-    if (_storage->size() >= sizeof(Header)) {
-        memcpy(&_header, _storage->data(), sizeof(Header));
-    }
-}
-
-const Header& KTX::getHeader() const {
-    return _header;
-}
-
-size_t KTX::getKeyValueDataSize() const {
-    return _header.bytesOfKeyValueData;
-}
-
-size_t KTX::getTexelsDataSize() const {
-    if (!_storage) {
-        return 0;
-    }
-    return _storage->size() - sizeof(Header) - getKeyValueDataSize();
-}
-
-const Byte* KTX::getKeyValueData() const {
-    if (!_storage) {
-        return nullptr;
-    }
-    return (_storage->data() + sizeof(Header));
-}
-
-const Byte* KTX::getTexelsData() const {
-    if (!_storage) {
-        return nullptr;
-    }
-    return (_storage->data() + sizeof(Header) + getKeyValueDataSize());
-}
-
-storage::StoragePointer KTX::getMipFaceTexelsData(uint16_t mip, uint8_t face) const {
-    storage::StoragePointer result;
-    if (mip < _images.size()) {
-        const auto& faces = _images[mip];
-        if (face < faces._numFaces) {
-            auto faceOffset = faces._faceBytes[face] - _storage->data();
-            auto faceSize = faces._faceSize;
-            result = _storage->createView(faceSize, faceOffset);
-        }
-    }
-    return result;
-}
-
-ImageDescriptor Image::toImageDescriptor(const Byte* baseAddress) const {
-    FaceOffsets offsets;
-    offsets.resize(_faceBytes.size());
-    for (size_t face = 0; face < _numFaces; ++face) {
-        offsets[face] = _faceBytes[face] - baseAddress;
-    }
-    // Note, implicit cast of *this to const ImageHeader&
-    return ImageDescriptor(*this, offsets);
-}
-
-Image ImageDescriptor::toImage(const ktx::StoragePointer& storage) const {
-    FaceBytes faces;
-    faces.resize(_faceOffsets.size());
-    for (size_t face = 0; face < _numFaces; ++face) {
-        faces[face] = storage->data() + _faceOffsets[face];
-    }
-    // Note, implicit cast of *this to const ImageHeader&
-    return Image(*this, faces);
-}
-
-KTXDescriptor KTX::toDescriptor() const {
-    ImageDescriptors newDescriptors;
-    auto storageStart = _storage ? _storage->data() : nullptr;
-    for (size_t i = 0; i < _images.size(); ++i) {
-        newDescriptors.emplace_back(_images[i].toImageDescriptor(storageStart));
-    }
-    return { this->_header, newDescriptors, this->_keyValues };
-}
-
-KTX::KTX(const StoragePointer& storage, const Header& header, const KeyValues& keyValues, const Images& images)
-    : _header(header)
-    , _storage(storage)
-    , _keyValues(keyValues)
-    , _images(images) {
-}
-
-#endif
-
 }}  // namespace khronos::ktx
 
-//#endif

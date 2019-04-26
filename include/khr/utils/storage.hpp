@@ -14,6 +14,8 @@
 
 #if defined(__ANDROID__)
 #include <android/asset_manager.h>
+#elif defined(_WIN32)
+#include <Windows.h>
 #endif
 
 namespace khr { namespace utils {
@@ -21,12 +23,13 @@ namespace khr { namespace utils {
 // Abstract class to represent memory that stored _somewhere_ (in system memory or in a file, for example)
 class Storage : public ::std::enable_shared_from_this<Storage> {
 public:
-#if defined(__ANDROID__)
-    static void setAssetManager(AAssetManager* assetManager);
-#endif
 
     using Pointer = ::std::shared_ptr<Storage>;
     using ConstPointer = std::shared_ptr<const Storage>;
+
+
+    Storage(const Storage&) = delete;
+    Storage() = default;
     virtual ~Storage() = default;
 
     virtual const uint8_t* data() const = 0;
@@ -37,70 +40,41 @@ public:
     static ConstPointer create(size_t size, uint8_t* data = nullptr);
     static ConstPointer createFile(const std::string& filename, size_t size, const void* data = nullptr);
     template <typename T = uint8_t>
-    static ConstPointer createFile(const std::string& filename, const std::vector<T>& data) {
+    static inline ConstPointer createFile(const std::string& filename, const std::vector<T>& data) {
         return createFile(filename, data.size() * sizeof(T), data.data());
     }
     static ConstPointer readFile(const std::string& filename);
 
-    ConstPointer createView(size_t size = 0, size_t offset = 0) const;
+    inline ConstPointer createView(size_t size = 0, size_t offset = 0) const;
 
-private:
 #if defined(__ANDROID__)
-    static AAssetManager* assetManager;
+protected:
+    static inline AAssetManager*& getAssetManager() {
+        static AAssetManager* ASSET_MANAGER;
+        return ASSET_MANAGER;
+    }
+public:
+    static inline void setAssetManager(AAssetManager* assetManager) {
+        getAssetManager() = assetManager;
+    }
 #endif
 };
-
-}}  // namespace khr::utils
-
-#define KHR_UTILS_STORAGE_IMPLEMENTATION
-
-#if defined(KHR_UTILS_STORAGE_IMPLEMENTATION)
-#if defined(_WIN32)
-#include <Windows.h>
-#endif
-
-namespace khr { namespace utils {
-
-#if defined(__ANDROID__)
-AAssetManager* Storage::assetManager{ nullptr };
-
-void Storage::setAssetManager(AAssetManager* assetManager) {
-    Storage::assetManager = assetManager;
-}
-#endif
 
 class ViewStorage : public Storage {
 public:
     ViewStorage(const ConstPointer& owner, size_t size, size_t offset)
-        : _owner(owner)
-        , _size(size)
-        , _offset(offset) {}
-    const uint8_t* data() const override { return _owner->data() + _offset; }
-    size_t size() const override { return _size; }
-    bool isFast() const override { return _owner->isFast(); }
+            : _owner(owner)
+            , _size(size)
+            , _offset(offset) {}
+    inline const uint8_t* data() const override { return _owner->data() + _offset; }
+    inline size_t size() const override { return _size; }
+    inline bool isFast() const override { return _owner->isFast(); }
 
 private:
     const ConstPointer _owner;
     const size_t _size;
     const size_t _offset;
 };
-
-class WrapperStorage : public Storage {
-public:
-    WrapperStorage(size_t size, const uint8_t* data)
-        : _size(size)
-        , _data(data) {}
-    const size_t _size;
-    const uint8_t* const _data;
-
-    const uint8_t* data() const override { return _data; }
-    size_t size() const override { return _size; }
-    bool isFast() const override { return true; }
-};
-
-Storage::ConstPointer Storage::wrap(size_t size, uint8_t* data) {
-    return std::make_shared<const WrapperStorage>(size, data);
-}
 
 Storage::ConstPointer Storage::createView(size_t viewSize, size_t offset) const {
     auto selfSize = size();
@@ -111,6 +85,23 @@ Storage::ConstPointer Storage::createView(size_t viewSize, size_t offset) const 
         throw std::runtime_error("Invalid mapping range");
     }
     return std::make_shared<ViewStorage>(shared_from_this(), viewSize, offset);
+}
+
+class WrapperStorage : public Storage {
+public:
+    WrapperStorage(size_t size, const uint8_t* data)
+            : _size(size)
+            , _data(data) {}
+    const size_t _size;
+    const uint8_t* const _data;
+
+    const uint8_t* data() const override { return _data; }
+    size_t size() const override { return _size; }
+    bool isFast() const override { return true; }
+};
+
+inline Storage::ConstPointer Storage::wrap(size_t size, uint8_t* data) {
+    return std::make_shared<const WrapperStorage>(size, data);
 }
 
 class MemoryStorage : public Storage {
@@ -129,7 +120,7 @@ private:
     std::vector<uint8_t> _data;
 };
 
-Storage::ConstPointer Storage::create(size_t size, uint8_t* data) {
+inline Storage::ConstPointer Storage::create(size_t size, uint8_t* data) {
     return std::make_shared<MemoryStorage>(size, data);
 }
 
@@ -152,17 +143,17 @@ private:
     AAsset* _asset{ nullptr };
 #elif defined(_WIN32)
     HANDLE _file{ INVALID_HANDLE_VALUE };
-    HANDLE _mapFile{ INVALID_HANDLE_VALUE };
+HANDLE _mapFile{ INVALID_HANDLE_VALUE };
 #else
-    // FIXME add support for posix memory mapped data
-    std::vector<uint8_t> _data;
+// FIXME add support for posix memory mapped data
+std::vector<uint8_t> _data;
 #endif
 };
 
-FileStorage::FileStorage(const std::string& filename) {
+inline FileStorage::FileStorage(const std::string& filename) {
 #if defined(__ANDROID__)
     // Load shader from compressed asset
-    _asset = AAssetManager_open(assetManager, filename.c_str(), AASSET_MODE_BUFFER);
+    _asset = AAssetManager_open(getAssetManager(), filename.c_str(), AASSET_MODE_BUFFER);
     assert(_asset);
     _size = AAsset_getLength(_asset);
     assert(_size > 0);
@@ -179,7 +170,7 @@ FileStorage::FileStorage(const std::string& filename) {
     }
     _mapFile = CreateFileMappingA(_file, NULL, PAGE_READONLY, 0, 0, NULL);
     if (_mapFile == INVALID_HANDLE_VALUE) {
-        throw std::runtime_error("Failed to create mapping");
+    throw std::runtime_error("Failed to create mapping");
     }
     _mapped = (uint8_t*)MapViewOfFile(_mapFile, FILE_MAP_READ, 0, 0, 0);
 #else
@@ -205,7 +196,7 @@ FileStorage::FileStorage(const std::string& filename) {
 #endif
 }
 
-FileStorage::~FileStorage() {
+inline FileStorage::~FileStorage() {
 #if defined(__ANDROID__)
     AAsset_close(_asset);
 #elif defined(_WIN32)
@@ -216,9 +207,8 @@ FileStorage::~FileStorage() {
 #endif
 }
 
-Storage::ConstPointer Storage::readFile(const std::string& filename) {
+inline Storage::ConstPointer Storage::readFile(const std::string& filename) {
     return std::make_shared<const FileStorage>(filename);
 }
 
 }}  // namespace khr::utils
-#endif

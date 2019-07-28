@@ -11,8 +11,7 @@
 #define khronos_khr_hpp
 
 #include <unordered_map>
-
-#include <KHR/khrplatform.h>
+#include <cstdint>
 
 namespace khronos {
 namespace gl {

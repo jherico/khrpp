@@ -1,21 +1,31 @@
-# If we're running under the gradle build, HIFI_ANDROID will be set here, but
-# ANDROID will not be set until after the `project` statement.  This is the *ONLY*
-# place you need to use `HIFI_ANDROID` instead of `ANDROID`
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.15)
+
+option(BUILD_TESTS "Build tests" ON)
+option(BUILD_TOOLS "Build tools" ON)
+option(BUILD_INSTALLER "Build installer" OFF)
+
+MESSAGE(STATUS "Build tests:           " ${BUILD_TESTS})
+MESSAGE(STATUS "Build tools:           " ${BUILD_TOOLS})
+MESSAGE(STATUS "Build installer:       " ${BUILD_INSTALLER})
+
+if (BUILD_TESTS OR BUILD_TOOLS)
+    set(VCPKG_PACKAGES egl-registry fmt opengl-registry glm gtest basisu)
+    if (BUILD_TOOLS)
+        #list(APPEND VCPKG_PACKAGES qt5-base)
+    endif()
+    include(${CMAKE_SOURCE_DIR}/cmake/ezvcpkg.cmake)
+
+    ezvcpkg_fetch(
+        PACKAGES ${VCPKG_PACKAGES}
+        OUTPUT EZVCPKG_DIR
+        UPDATE_TOOLCHAIN
+    )
+endif()
 
 project(hkrpp)
 
 include("cmake/init.cmake")
-
 include("cmake/compiler.cmake")
-
-option(BUILD_TESTS "Build tests" ON)
-option(BUILD_TOOLS "Build tools" ON)
-#option(BUILD_INSTALLER "Build installer" OFF)
-
-MESSAGE(STATUS "Build tests:           " ${BUILD_TESTS})
-MESSAGE(STATUS "Build tools:           " ${BUILD_TOOLS})
-#MESSAGE(STATUS "Build installer:       " ${BUILD_INSTALLER})
 
 #
 # Helper projects
@@ -32,10 +42,6 @@ unset(KHR_SRC)
 
 find_package(Threads)
 
-set(EXTERNAL_PROJECT_PREFIX "project")
-set_property(DIRECTORY PROPERTY EP_PREFIX ${EXTERNAL_PROJECT_PREFIX})
-setup_externals_binary_dir()
-
 if (BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
@@ -43,8 +49,8 @@ endif()
 if (BUILD_TESTS)
     include(CTest)
     enable_testing()
-    include(GoogleTest)
-    set(GTEST_ROOT "D:/GoogleTest")
+    find_package(GTest MODULE REQUIRED)                                      
     find_package(GTest REQUIRED)
     add_subdirectory(tests)
 endif()
+                                                                         

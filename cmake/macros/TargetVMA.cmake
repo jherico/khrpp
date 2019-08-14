@@ -1,5 +1,0 @@
-macro(TARGET_VMA)
-    # Enable AMD Vulkan Memory Allocator (open source block memory manager)
-    target_compile_definitions(${TARGET_NAME} PRIVATE KHRPP_VULKAN_USE_VMA)
-    target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/external/vma/src)
-endmacro()

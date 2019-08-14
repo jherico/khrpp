@@ -1,15 +1,3 @@
-[submodule "external/egl"]
-	path = external/egl
-	url = git@github.com:KhronosGroup/EGL-Registry.git
-[submodule "external/gl"]
-	path = external/gl
-	url = git@github.com:KhronosGroup/OpenGL-Registry.git
 [submodule "external/ktx"]
 	path = external/ktx
 	url = git@github.com:KhronosGroup/KTX-Software.git
-[submodule "external/glm"]
-	path = external/glm
-	url = git@github.com:g-truc/glm.git
-[submodule "external/vma"]
-	path = external/vma
-	url = git@github.com:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

@@ -15,5 +15,7 @@ jobs:
       run: cmake .
     - name: build
       run: cmake --build .
-    - name: test
-      run: cmake --build . --target RUN_TESTS
+    - name: test build
+      run: cmake --build . --target test
+    - name: test run
+      run: ctest -C Debug

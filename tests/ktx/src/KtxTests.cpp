@@ -9,7 +9,6 @@
 #include <mutex>
 #include <string>
 #include <iostream>
-#include <filesystem>
 #include <gtest/gtest.h>
 
 #include <khrpp/storage.hpp>

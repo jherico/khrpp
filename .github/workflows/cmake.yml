@@ -1,0 +1,17 @@
+name: CMake CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: cmake configure
+      run: cmake .
+    - name: build
+      run: cmake --build .
+    - name: test
+      run: cmake --build . --target RUN_TESTS

@@ -3,11 +3,11 @@
 
 
 std::list<std::string> getKtxTestFiles() {
-    return khrpp::splitString(KTX_TEST_FILES, ':');
+    return khrpp::splitString(KTX_TEST_FILES, '|');
 }
 
 std::list<std::string> getKtx2TestFiles() {
-    return khrpp::splitString(KTX2_TEST_FILES, ':');
+    return khrpp::splitString(KTX2_TEST_FILES, '|');
 }
 
 

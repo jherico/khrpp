@@ -5,14 +5,11 @@
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
 #include <khrpp/ktx.hpp>
-
-#include <mutex>
-#include <string>
-#include <iostream>
-#include <gtest/gtest.h>
-
 #include <khrpp/storage.hpp>
+
 #include "TestResources.h"
+
+#include <gtest/gtest.h>
 
 using namespace khrpp;
 
@@ -80,4 +77,3 @@ TEST_F(KtxTest, testKtx2Invalidation) {
         ASSERT_FALSE(ktx::Descriptor::validate(storage->data(), storage->size()));
     }
 }
-

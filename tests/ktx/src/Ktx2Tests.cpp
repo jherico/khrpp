@@ -6,14 +6,11 @@
 //
 
 #include <khrpp/ktx2.hpp>
-
-#include <mutex>
-#include <string>
-#include <iostream>
-#include <gtest/gtest.h>
-
 #include <khrpp/storage.hpp>
+
 #include "TestResources.h"
+
+#include <gtest/gtest.h>
 
 using namespace khrpp;
 

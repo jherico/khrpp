@@ -46,27 +46,24 @@ macro(EZVCPKG_CALCULATE_PATHS)
     file(TO_CMAKE_PATH "${EZVCPKG_BASEDIR}/${EZVCPKG_COMMIT}.lock" EZVCPKG_LOCK)
 
     if (EZVCPKG_USE_HOST_VCPKG)
-        find_program(HOST_VCPKG vcpkg)
-        message(STATUS "HOST_VCPKG ${HOST_VCPKG}")
-        if (HOST_VCPKG)
-            set(EZVCPKG_EXE ${HOST_VCPKG})
-        endif()
+        find_program(EZVCPKG_HOST_VCPKG vcpkg)
+        message(STATUS "EZVCPKG_HOST_VCPKG ${EZVCPKG_HOST_VCPKG}")
     endif()
 
 
-    if (NOT EZVCPKG_EXE)
-        if (WIN32)
-            file(TO_CMAKE_PATH "${EZVCPKG_DIR}/vcpkg.exe" EZVCPKG_EXE)
-            file(TO_CMAKE_PATH "${EZVCPKG_DIR}/bootstrap-vcpkg.bat" EZVCPKG_BOOTSTRAP)
-        else()
-            file(TO_CMAKE_PATH "${EZVCPKG_DIR}/vcpkg" EZVCPKG_EXE)
-            file(TO_CMAKE_PATH "${EZVCPKG_DIR}/bootstrap-vcpkg.sh" EZVCPKG_BOOTSTRAP)
-        endif()
+    if (WIN32)
+        file(TO_CMAKE_PATH "${EZVCPKG_DIR}/vcpkg.exe" EZVCPKG_EXE)
+        file(TO_CMAKE_PATH "${EZVCPKG_DIR}/bootstrap-vcpkg.bat" EZVCPKG_BOOTSTRAP)
+    else()
+        file(TO_CMAKE_PATH "${EZVCPKG_DIR}/vcpkg" EZVCPKG_EXE)
+        file(TO_CMAKE_PATH "${EZVCPKG_DIR}/bootstrap-vcpkg.sh" EZVCPKG_BOOTSTRAP)
     endif()
 
     # The tag file exists purely to be a touch target every time the ezvcpkg macro is called
     # making it easy to find out of date ezvcpkg folder.  
     file(TO_CMAKE_PATH "${EZVCPKG_DIR}/.tag" EZVCPKG_TAG)
+    file(TO_CMAKE_PATH "${EZVCPKG_DIR}/README.md" EZVCPKG_README)
+    
 
     # The whole host-triplet / triplet setup is to support cross compiling, specifically for things 
     # like android.  The idea is that some things you might need from vcpkg to act as tools to execute 
@@ -92,7 +89,7 @@ macro(EZVCPKG_CALCULATE_PATHS)
 endmacro()
 
 macro(EZVCPKG_BOOTSTRAP)
-    if (NOT EXISTS ${EZVCPKG_EXE})
+    if (NOT EXISTS ${EZVCPKG_README})
         message(STATUS "EZVCPKG Bootstrapping")
         find_package(Git)
         if (NOT Git_FOUND)
@@ -102,19 +99,23 @@ macro(EZVCPKG_BOOTSTRAP)
         execute_process(
             COMMAND ${GIT_EXECUTABLE} "clone" ${EZVCPKG_URL} ${EZVCPKG_DIR}
             OUTPUT_QUIET)
-
         message(STATUS "EZVCPKG Checking out commit ${EZVCPKG_COMMIT}")
         execute_process(
             COMMAND ${GIT_EXECUTABLE} "checkout" ${EZVCPKG_COMMIT}
             WORKING_DIRECTORY ${EZVCPKG_DIR}
             OUTPUT_QUIET)
+    endif()
 
+    if (EZVCPKG_HOST_VCPKG)
+        set(EZVCPKG_EXE ${EZVCPKG_HOST_VCPKG})
+    elseif(NOT EXISTS ${EZVCPKG_EXE})
         message(STATUS "EZVCPKG Bootstrapping vcpkg binary")
         execute_process(
             COMMAND ${EZVCPKG_BOOTSTRAP}
             WORKING_DIRECTORY ${EZVCPKG_DIR}
             OUTPUT_QUIET)
     endif()
+
     if (NOT EXISTS ${EZVCPKG_EXE})
         message(FATAL_ERROR "EZVCPKG vcpkg bootstrap failed")
     endif()

@@ -115,6 +115,9 @@ macro(EZVCPKG_BOOTSTRAP)
             WORKING_DIRECTORY ${EZVCPKG_DIR}
             OUTPUT_QUIET)
     endif()
+    if (NOT EXISTS ${EZVCPKG_EXE})
+        message(FATAL_ERROR "EZVCPKG vcpkg bootstrap failed")
+    endif()
 endmacro()
 
 macro(EZVCPKG_BUILD)

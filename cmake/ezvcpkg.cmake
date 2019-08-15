@@ -35,11 +35,12 @@ macro(EZVCPKG_CALCULATE_PATHS)
                 # home directory instead
                 set(EZVCPKG_BASEDIR "$ENV{HOME}/.ezvcpkg")
             else()
+                # Initially defaulted to $ENV{TEMP} but the github build hosts don't populate this
                 set(EZVCPKG_BASEDIR "$ENV{HOME}/.ezvcpkg")
             endif()
             # We want people to specify a base directory, either through the calling EZVCPKG_FETCH 
             # function or through an environment variable.  
-            message(WARNING "EZVCPKG_BASEDIR envrionment variable not found and basedir not set, using default ${EZVCPKG_BASEDIR}")
+            message(STATUS "EZVCPKG_BASEDIR envrionment variable not found and basedir not set, using default ${EZVCPKG_BASEDIR}")
         endif()
     endif()
     file(TO_CMAKE_PATH "${EZVCPKG_BASEDIR}/${EZVCPKG_COMMIT}" EZVCPKG_DIR)
@@ -47,7 +48,9 @@ macro(EZVCPKG_CALCULATE_PATHS)
 
     if (EZVCPKG_USE_HOST_VCPKG)
         find_program(EZVCPKG_HOST_VCPKG vcpkg)
-        message(STATUS "EZVCPKG_HOST_VCPKG ${EZVCPKG_HOST_VCPKG}")
+        if (EZVCPKG_HOST_VCPKG)
+            message(STATUS "EZVCPKG using host vcpkg binary ${EZVCPKG_HOST_VCPKG}")
+        endif()
     endif()
 
 
@@ -99,6 +102,10 @@ macro(EZVCPKG_BOOTSTRAP)
         execute_process(
             COMMAND ${GIT_EXECUTABLE} "clone" ${EZVCPKG_URL} ${EZVCPKG_DIR}
             OUTPUT_QUIET)
+
+        # FIXME put this into a separate check verifying the commit ID of the current directory
+        # If the previous run had the clone work, but the checkout fail, the readme will be 
+        # present and the user will have the default checkout, rather than their requested commit
         message(STATUS "EZVCPKG Checking out commit ${EZVCPKG_COMMIT}")
         execute_process(
             COMMAND ${GIT_EXECUTABLE} "checkout" ${EZVCPKG_COMMIT}
@@ -117,7 +124,7 @@ macro(EZVCPKG_BOOTSTRAP)
     endif()
 
     if (NOT EXISTS ${EZVCPKG_EXE})
-        message(FATAL_ERROR "EZVCPKG vcpkg bootstrap failed")
+        message(FATAL_ERROR "EZVCPKG vcpkg binary not failed")
     endif()
 endmacro()
 

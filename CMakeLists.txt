@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.12)
 
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_TOOLS "Build tools" ON)

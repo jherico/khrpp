@@ -426,7 +426,6 @@ inline void Descriptor::parse(const uint8_t* const data, size_t size) {
 
     // Key/value data
     if (header.kvdByteLength) {
-        auto offset = buffer.offset();
         if (buffer.offset() != header.kvdByteOffset) {
             throw std::runtime_error("Invalid key/value data byte offset");
         }

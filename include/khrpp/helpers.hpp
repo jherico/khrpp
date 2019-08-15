@@ -11,8 +11,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <list>
+#include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "constants.hpp"
+
 
 #if defined(HAVE_STD_FORMAT)
 #include <format>
@@ -132,6 +137,24 @@ inline void parseKtxKeyValueData(AlignedStreamBuffer kvBuffer, KeyValueMap& resu
     if (!kvBuffer.empty()) {
         throw std::runtime_error("Unexpected additional KVD data");
     }
+}
+
+// Currently only used by testing code
+inline std::list<std::string> splitString(const std::string& source, const char delimiter = ' ') {
+    std::list<std::string> result;
+    size_t start = 0, next;
+
+    while (std::string::npos != (next = source.find(delimiter, start))) {
+        std::string sub = source.substr(start, next - start);
+        if (!sub.empty()) {
+            result.push_back(sub);
+        }
+        start = next + 1;
+    }
+    if (source.size() > start) {
+        result.push_back(source.substr(start));
+    }
+    return result;
 }
 
 }  // namespace khrpp

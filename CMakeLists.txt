@@ -20,7 +20,6 @@ if (BUILD_TESTS OR BUILD_TOOLS)
         OUTPUT EZVCPKG_DIR
         UPDATE_TOOLCHAIN
         USE_HOST_VCPKG
-        SERIALIZE
     )
 endif()
 
@@ -38,9 +37,11 @@ GroupSources("cmake")
 unset(CMAKE_SRC)
 
 file(GLOB_RECURSE KHR_SRC include/*.hpp include/*.cpp)
-add_custom_target(khr SOURCES ${KHR_SRC})
+add_custom_target(khrpp_source SOURCES ${KHR_SRC})
 GroupSources("khr")
 unset(KHR_SRC)
+add_library(khrpp INTERFACE)
+target_include_directories(khrpp INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 find_package(Threads)
 

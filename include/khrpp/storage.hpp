@@ -10,12 +10,20 @@
 
 #include <cstdint>
 #include <vector>
+#include <fstream>
 #include <memory>
 
 #if defined(__ANDROID__)
 #include <android/asset_manager.h>
 #elif defined(_WIN32)
 #include <Windows.h>
+#else
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #endif
 
 namespace khrpp { namespace utils {
@@ -136,8 +144,7 @@ private:
     HANDLE _file{ INVALID_HANDLE_VALUE };
     HANDLE _mapFile{ INVALID_HANDLE_VALUE };
 #else
-    // FIXME add support for posix memory mapped data
-    std::vector<uint8_t> _data;
+    int _fd{ -1 };
 #endif
 };
 
@@ -165,25 +172,22 @@ inline FileStorage::FileStorage(const std::string& filename) {
     }
     _mapped = (uint8_t*)MapViewOfFile(_mapFile, FILE_MAP_READ, 0, 0, 0);
 #else
-    // FIXME move to posix memory mapped files
-    // open the file:
-    std::ifstream file(filename, std::ios::binary);
-    // Stop eating new lines in binary mode!!!
-    file.unsetf(std::ios::skipws);
+    _fd = open(filename.c_str(), O_RDONLY);
+    if (-1 == _fd) {
+        throw std::runtime_error("Failed to open file");
+    }
 
-    // get its size:
-    std::streampos fileSize;
-
-    file.seekg(0, std::ios::end);
-    fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    // reserve capacity
-    _data.reserve(fileSize);
-
-    // read the data:
-    _data.insert(vec.begin(), std::istream_iterator<uint8_t>(file), std::istream_iterator<uint8_t>());
-    file.close();
+    {
+        struct stat sb;
+        if (-1 == fstat(_fd, &sb)) {
+            throw std::runtime_error("Unable to stat file");
+        }
+        _size = sb.st_size;
+    }
+    _mapped = static_cast<uint8_t*>(mmap(nullptr, _size, PROT_READ, MAP_PRIVATE, _fd, 0));
+    if (_mapped == MAP_FAILED) {
+        throw std::runtime_error("Unable to mmap file");
+    }
 #endif
 }
 
@@ -195,6 +199,8 @@ inline FileStorage::~FileStorage() {
     CloseHandle(_mapFile);
     CloseHandle(_file);
 #else
+    munmap(_mapped, _size);
+    close(_fd);
 #endif
 }
 

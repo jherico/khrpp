@@ -4,7 +4,6 @@
 //  Distributed under the Apache License, Version 2.0.
 //  See the accompanying file LICENSE or http://www.apache.org/licenses/LICENSE-2.0.html
 //
-
 #include <khrpp/ktx.hpp>
 
 #include <mutex>
@@ -13,26 +12,10 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-#include "storage.hpp"
+#include <khrpp/storage.hpp>
+#include "TestResources.h"
 
-namespace fs {
-using namespace std::filesystem;
-}
-
-const fs::path& getKtxResourcePath() {
-    static const fs::path RESOURCE_PATH = fs::path(__FILE__ "/../../../../external/ktx/tests/testimages").lexically_normal();
-    return RESOURCE_PATH;
-}
-
-std::vector<fs::path> getKtxTestFiles() {
-    std::vector<fs::path> result;
-    for (const auto& p : fs::directory_iterator(getKtxResourcePath())) {
-        if (p.is_regular_file() && p.path().extension() == ".ktx") {
-            result.push_back(p.path());
-        }
-    }
-    return result;
-}
+using namespace khrpp;
 
 class KtxTest : public ::testing::Test {
 protected:
@@ -85,9 +68,17 @@ TEST_F(KtxTest, testKhronosCompressionFunctions) {
 }
 
 TEST_F(KtxTest, testValidation) {
-    using namespace khrpp;
     for (const auto& file : getKtxTestFiles()) {
-        auto storage = khrpp::utils::Storage::readFile(file.string());
+        auto storage = khrpp::utils::Storage::readFile(file);
         ASSERT_TRUE(ktx::Descriptor::validate(storage->data(), storage->size()));
     }
+
 }
+
+TEST_F(KtxTest, testKtx2Invalidation) {
+    for (const auto& file : getKtx2TestFiles()) {
+        auto storage = khrpp::utils::Storage::readFile(file);
+        ASSERT_FALSE(ktx::Descriptor::validate(storage->data(), storage->size()));
+    }
+}
+

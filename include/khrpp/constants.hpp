@@ -485,9 +485,10 @@ inline uint8_t evalComponentCount(BaseInternalFormat format) {
         case BaseInternalFormat::DEPTH_STENCIL:
         case BaseInternalFormat::RG:
             return 2;
+        case BaseInternalFormat::SRGB:
         case BaseInternalFormat::RGB:
             return 3;
-
+        case BaseInternalFormat::SRGB_ALPHA:
         case BaseInternalFormat::RGBA:
             return 4;
     }

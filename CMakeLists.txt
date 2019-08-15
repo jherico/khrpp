@@ -13,12 +13,14 @@ if (BUILD_TESTS OR BUILD_TOOLS)
     if (BUILD_TOOLS)
         #list(APPEND VCPKG_PACKAGES qt5-base)
     endif()
-    include(${CMAKE_SOURCE_DIR}/cmake/ezvcpkg/ezvcpkg.cmake)
+    include(${CMAKE_SOURCE_DIR}/cmake/ezvcpkg.cmake)
 
     ezvcpkg_fetch(
         PACKAGES ${VCPKG_PACKAGES}
         OUTPUT EZVCPKG_DIR
         UPDATE_TOOLCHAIN
+        USE_HOST_VCPKG
+        SERIALIZE
     )
 endif()
 

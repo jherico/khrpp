@@ -42,7 +42,7 @@ public:
     virtual size_t size() const = 0;
     virtual bool isFast() const = 0;
 
-    static ConstPointer wrap(size_t size, uint8_t* data);
+    static ConstPointer wrap(size_t size, uint8_t* data, bool fast = false);
     static ConstPointer create(size_t size, uint8_t* data = nullptr);
     static ConstPointer readFile(const std::string& filename);
     inline ConstPointer createView(size_t size = 0, size_t offset = 0) const;
@@ -62,9 +62,13 @@ public:
 class ViewStorage : public Storage {
 public:
     ViewStorage(const ConstPointer& owner, size_t size, size_t offset)
-        : _owner(owner)
-        , _size(size)
-        , _offset(offset) {}
+        : _owner{ owner }
+        , _size{ size }
+        , _offset{ offset } {
+		if (offset + size > owner->size()) {
+			throw new std::runtime_error("Invalid view range");
+		}
+	}
     inline const uint8_t* data() const override { return _owner->data() + _offset; }
     inline size_t size() const override { return _size; }
     inline bool isFast() const override { return _owner->isFast(); }
@@ -78,29 +82,28 @@ private:
 Storage::ConstPointer Storage::createView(size_t viewSize, size_t offset) const {
     auto selfSize = size();
     if (0 == viewSize) {
-        viewSize = selfSize;
-    }
-    if ((viewSize + offset) > selfSize) {
-        throw std::runtime_error("Invalid mapping range");
+        viewSize = selfSize - offset;
     }
     return std::make_shared<ViewStorage>(shared_from_this(), viewSize, offset);
 }
 
 class WrapperStorage : public Storage {
 public:
-    WrapperStorage(size_t size, const uint8_t* data)
-        : _size(size)
-        , _data(data) {}
+    WrapperStorage(size_t size, const uint8_t* data, bool fast = false)
+        : _size{ size }
+        , _data{ data }
+        , _fast{ fast } {}
     const size_t _size;
     const uint8_t* const _data;
+    const bool _fast;
 
     const uint8_t* data() const override { return _data; }
     size_t size() const override { return _size; }
     bool isFast() const override { return true; }
 };
 
-inline Storage::ConstPointer Storage::wrap(size_t size, uint8_t* data) {
-    return std::make_shared<const WrapperStorage>(size, data);
+inline Storage::ConstPointer Storage::wrap(size_t size, uint8_t* data, bool fast) {
+    return std::make_shared<const WrapperStorage>(size, data, fast);
 }
 
 class MemoryStorage : public Storage {
@@ -136,8 +139,8 @@ public:
     bool isFast() const override { return false; }
 
 private:
-    size_t _size{ 0 };
-    uint8_t* _mapped{ nullptr };
+    const size_t _size{ 0 };
+    const uint8_t* const _mapped{ nullptr };
 #if defined(__ANDROID__)
     AAsset* _asset{ nullptr };
 #elif defined(_WIN32)
@@ -153,9 +156,9 @@ inline FileStorage::FileStorage(const std::string& filename) {
     // Load shader from compressed asset
     _asset = AAssetManager_open(getAssetManager(), filename.c_str(), AASSET_MODE_BUFFER);
     assert(_asset);
-    _size = AAsset_getLength(_asset);
+    const_cast<size_t&>(_size) = AAsset_getLength(_asset);
     assert(_size > 0);
-    _mapped = (uint8_t*)(AAsset_getBuffer(_asset));
+    const_cast<const uint8_t*&>(_mapped) = (uint8_t*)(AAsset_getBuffer(_asset));
 #elif defined(_WIN32)
     _file = CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (_file == INVALID_HANDLE_VALUE) {
@@ -163,14 +166,14 @@ inline FileStorage::FileStorage(const std::string& filename) {
     }
     {
         DWORD dwFileSizeHigh;
-        _size = GetFileSize(_file, &dwFileSizeHigh);
-        _size += (((size_t)dwFileSizeHigh) << 32);
+        const_cast<size_t&>(_size) = GetFileSize(_file, &dwFileSizeHigh);
+        const_cast<size_t&>(_size) += (((size_t)dwFileSizeHigh) << 32);
     }
     _mapFile = CreateFileMappingA(_file, NULL, PAGE_READONLY, 0, 0, NULL);
     if (0 == _mapFile || _mapFile == INVALID_HANDLE_VALUE) {
         throw std::runtime_error("Failed to create mapping");
     }
-    _mapped = (uint8_t*)MapViewOfFile(_mapFile, FILE_MAP_READ, 0, 0, 0);
+    const_cast<const uint8_t*&>(_mapped) = (uint8_t*)MapViewOfFile(_mapFile, FILE_MAP_READ, 0, 0, 0);
 #else
     _fd = open(filename.c_str(), O_RDONLY);
     if (-1 == _fd) {
@@ -182,9 +185,9 @@ inline FileStorage::FileStorage(const std::string& filename) {
         if (-1 == fstat(_fd, &sb)) {
             throw std::runtime_error("Unable to stat file");
         }
-        _size = sb.st_size;
+        const_cast<size_t&>(_size) = sb.st_size;
     }
-    _mapped = static_cast<uint8_t*>(mmap(nullptr, _size, PROT_READ, MAP_PRIVATE, _fd, 0));
+    const_cast<const uint8_t*&>(_mapped) = static_cast<uint8_t*>(mmap(nullptr, _size, PROT_READ, MAP_PRIVATE, _fd, 0));
     if (_mapped == MAP_FAILED) {
         throw std::runtime_error("Unable to mmap file");
     }
@@ -199,7 +202,7 @@ inline FileStorage::~FileStorage() {
     CloseHandle(_mapFile);
     CloseHandle(_file);
 #else
-    munmap(_mapped, _size);
+    munmap(const_cast<uint8_t*&>(_mapped), _size);
     close(_fd);
 #endif
 }

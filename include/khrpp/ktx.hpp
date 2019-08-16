@@ -157,7 +157,7 @@ struct Descriptor {
     static bool validate(const uint8_t* const data, size_t size) noexcept {
         try {
             Descriptor().parse(data, size);
-        } catch (const std::runtime_error& err) {
+        } catch (const std::runtime_error&) {
             return false;
         }
         return true;

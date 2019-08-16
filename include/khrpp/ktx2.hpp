@@ -450,7 +450,8 @@ inline void Descriptor::parse(const uint8_t* const data, size_t size) {
         }
 
         if (header.supercompressionScheme == SupercompressionScheme::BASIS) {
-            basisData.emplace().parse(header, data + header.sgdByteOffset, header.sgdByteLength);
+            basisData = std::optional<BasisDescriptor>{};
+            basisData->parse(header, data + header.sgdByteOffset, header.sgdByteLength);
         }
     }
 

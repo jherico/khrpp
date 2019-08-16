@@ -167,7 +167,7 @@ inline FileStorage::FileStorage(const std::string& filename) {
         _size += (((size_t)dwFileSizeHigh) << 32);
     }
     _mapFile = CreateFileMappingA(_file, NULL, PAGE_READONLY, 0, 0, NULL);
-    if (_mapFile == INVALID_HANDLE_VALUE) {
+    if (0 == _mapFile || _mapFile == INVALID_HANDLE_VALUE) {
         throw std::runtime_error("Failed to create mapping");
     }
     _mapped = (uint8_t*)MapViewOfFile(_mapFile, FILE_MAP_READ, 0, 0, 0);

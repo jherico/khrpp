@@ -40,7 +40,7 @@ struct Descriptor {
     };
 
     struct Header {
-        Byte identifier[IDENTIFIER_LENGTH];
+		Byte identifier[IDENTIFIER_LENGTH]{};
         vk::Format format{ vk::Format::UNDEFINED };
         uint32_t typeSize;
         uint32_t pixelWidth{ 1 };
@@ -78,21 +78,21 @@ struct Descriptor {
 
     struct BasisDescriptor {
         struct BasisHeader {
-            uint32_t globalFlags;
-            uint16_t endpointCount;
-            uint16_t selectorCount;
-            uint32_t endpointsByteLength;
-            uint32_t selectorsByteLength;
-            uint32_t tablesByteLength;
-            uint32_t extendedByteLength;
+            uint32_t globalFlags{ 0 };
+            uint16_t endpointCount{ 0 };
+            uint16_t selectorCount{ 0 };
+            uint32_t endpointsByteLength{ 0 };
+            uint32_t selectorsByteLength{ 0 };
+            uint32_t tablesByteLength{ 0 };
+            uint32_t extendedByteLength{ 0 };
         } header;
 
         struct BasisImageDescriptor {
-            uint32_t sliceFlags;
-            uint32_t sliceByteOffset;
-            uint32_t sliceByteLength;
-            uint32_t alphaSliceByteOffset;
-            uint32_t alphaSliceByteLength;
+            uint32_t sliceFlags{ 0 };
+            uint32_t sliceByteOffset{ 0 };
+            uint32_t sliceByteLength{ 0 };
+            uint32_t alphaSliceByteOffset{ 0 };
+            uint32_t alphaSliceByteLength{ 0 };
         };
 
         std::vector<BasisImageDescriptor> images;
@@ -112,14 +112,14 @@ struct Descriptor {
     static bool validate(const uint8_t* const data, size_t size) noexcept {
         try {
             Descriptor().parse(data, size);
-        } catch (const std::runtime_error& err) {
+        } catch (const std::runtime_error&) {
             return false;
         }
         return true;
     }
 };
 
-}}  // namespace khronos::ktx2
+}}  // namespace khrpp::ktx2
 
 namespace khrpp { namespace ktx2 {
 
@@ -386,9 +386,9 @@ inline void Descriptor::parse(const uint8_t* const data, size_t size) {
         throw std::runtime_error("Unable to parse KTX2 header");
     }
 
-	if (0 == VALID_VK_FORMATS().count(header.format)) {
-		throw std::runtime_error(FORMAT("Invalid vulkan format {}", static_cast<uint32_t>(header.format)));
-	}
+    if (0 == VALID_VK_FORMATS().count(header.format)) {
+        throw std::runtime_error(FORMAT("Invalid vulkan format {}", static_cast<uint32_t>(header.format)));
+    }
 
     if (0 != memcmp(IDENTIFIER().data(), header.identifier, IDENTIFIER_LENGTH)) {
         throw std::runtime_error("Invalid KTX identifier bytes");
@@ -433,7 +433,7 @@ inline void Descriptor::parse(const uint8_t* const data, size_t size) {
         if (!buffer.skip(header.kvdByteLength)) {
             throw std::runtime_error("Unable to read key/value data");
         }
-		parseKtxKeyValueData(kvBuffer, kvd);
+        parseKtxKeyValueData(kvBuffer, kvd);
     }
 
     if (!buffer.align(8)) {
@@ -481,6 +481,6 @@ inline void Descriptor::parse(const uint8_t* const data, size_t size) {
     }
 }
 
-}}  // namespace khronos::ktx2
+}}  // namespace khrpp::ktx2
 
 #endif

@@ -123,7 +123,7 @@ struct Descriptor {
 
     // Header
     struct Header {
-        Byte identifier[IDENTIFIER_LENGTH];
+		Byte identifier[IDENTIFIER_LENGTH]{};
         uint32_t endianness{ ENDIAN_TEST };
         GLType glType{ GLType::UNSIGNED_BYTE };
         uint32_t glTypeSize{ 0 };

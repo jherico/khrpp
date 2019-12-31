@@ -20,8 +20,8 @@
 #include <unordered_set>
 #include <unordered_map>
 
-#include "constants.hpp"
-#include "helpers.hpp"
+#include "../constants.hpp"
+#include "../helpers.hpp"
 
 namespace khrpp { namespace ktx {
 

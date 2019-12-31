@@ -65,10 +65,10 @@ public:
         : _owner{ owner }
         , _size{ size }
         , _offset{ offset } {
-		if (offset + size > owner->size()) {
-			throw new std::runtime_error("Invalid view range");
-		}
-	}
+        if (offset + size > owner->size()) {
+            throw new std::runtime_error("Invalid view range");
+        }
+    }
     inline const uint8_t* data() const override { return _owner->data() + _offset; }
     inline size_t size() const override { return _size; }
     inline bool isFast() const override { return _owner->isFast(); }
@@ -128,6 +128,17 @@ inline Storage::ConstPointer Storage::create(size_t size, uint8_t* data) {
 
 class FileStorage : public Storage {
 public:
+    template <typename T = void>
+    static void withBinaryFileContents(const std::string& filename, const std::function<void(const char* filename, size_t size, const T * data)>& handler) {
+        FileStorage storage{ filename };
+        handler(filename.c_str(), storage.size(), (const T*)storage.data());
+    }
+
+    template <typename T = void>
+    static void withBinaryFileContents(const std::string& filename, const std::function<void(size_t size, const T* data)>& handler) {
+        withBinaryFileContents<T>(filename, [&](const char* filename, size_t size, const T* data) { handler(size, data); });
+    }
+
     FileStorage(const std::string& filename);
     ~FileStorage();
     // Prevent copying & assignment
@@ -150,6 +161,7 @@ private:
     int _fd{ -1 };
 #endif
 };
+
 
 inline FileStorage::FileStorage(const std::string& filename) {
 #if defined(__ANDROID__)

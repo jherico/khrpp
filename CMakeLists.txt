@@ -33,7 +33,7 @@ include("cmake/compiler.cmake")
 #
 file(GLOB_RECURSE CMAKE_SRC cmake/*.cmake cmake/CMakeLists.txt)
 add_custom_target(cmake SOURCES ${CMAKE_SRC})
-GroupSources("cmake")
+GroupSources(${CMAKE_SOURCE_DIR} ${SOURCE}})
 unset(CMAKE_SRC)
 
 file(GLOB_RECURSE KHR_SRC include/*.hpp include/*.cpp)

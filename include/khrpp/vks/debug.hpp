@@ -64,39 +64,50 @@ struct Messenger : public Dispatchable {
 
     static void shutdown(const vk::Instance& instance);
 
-    static const std::list<std::string>& getDefaultLayerNames() {
-#if defined(__ANDROID__)
-        static std::list<std::string> LAYER_NAMES{
-            "VK_LAYER_GOOGLE_threading", "VK_LAYER_LUNARG_parameter_validation", "VK_LAYER_LUNARG_object_tracker", "VK_LAYER_LUNARG_core_validation",
-            "VK_LAYER_LUNARG_swapchain", "VK_LAYER_GOOGLE_unique_objects",
-        };
-#else
-        static std::list<std::string> LAYER_NAMES{
-            "VK_LAYER_LUNARG_assistant_layer",
-            // This is a meta layer that enables all of the standard
-            // validation layers in the correct order :
-            // threading, parameter_validation, device_limits, object_tracker, image, core_validation, swapchain, and unique_objects
-            "VK_LAYER_LUNARG_standard_validation",
-        };
-#endif
+    static const std::list<std::string>& getDefaultLayerNames(const std::set<std::string>& validLayerNames) {
+        static std::once_flag once;
+        static std::list<std::string> LAYER_NAMES;
+
+        std::call_once(once, [&] {
+            static auto layerNamesValidator = [&] {
+                return std::all_of(LAYER_NAMES.begin(), LAYER_NAMES.end(), [&](const std::string& layerName) { return validLayerNames.contains(layerName); });
+            };
+            LAYER_NAMES = { "VK_LAYER_KHRONOS_validation" };
+            if (!layerNamesValidator()) {
+                LAYER_NAMES = { "VK_LAYER_LUNARG_standard_validation" };
+            }
+            if (!layerNamesValidator()) {
+                LAYER_NAMES = {
+                    "VK_LAYER_GOOGLE_threading", "VK_LAYER_LUNARG_parameter_validation", "VK_LAYER_LUNARG_object_tracker", "VK_LAYER_LUNARG_core_validation",
+                    "VK_LAYER_LUNARG_swapchain", "VK_LAYER_GOOGLE_unique_objects",
+                };
+            }
+            if (!layerNamesValidator()) {
+                LAYER_NAMES = {};
+            }
+            if (validLayerNames.contains("VK_LAYER_LUNARG_assistant_layer")) {
+                LAYER_NAMES.insert(LAYER_NAMES.begin(), "VK_LAYER_LUNARG_assistant_layer");
+            }
+        });
+
         return LAYER_NAMES;
-    }
+}
 
-private:
-    static Callback& getMsgCallback() {
-        static Callback msgCallback;
-        return msgCallback;
-    }
+private : static Callback&
+          getMsgCallback() {
+    static Callback msgCallback;
+    return msgCallback;
+}
 
-    static VkBool32 callback(VkDebugReportFlagsEXT flags,
-                             VkDebugReportObjectTypeEXT objType,
-                             uint64_t srcObject,
-                             size_t location,
-                             int32_t msgCode,
-                             const char* pLayerPrefix,
-                             const char* pMsg,
-                             void* pUserData);
-};
+static VkBool32 callback(VkDebugReportFlagsEXT flags,
+                         VkDebugReportObjectTypeEXT objType,
+                         uint64_t srcObject,
+                         size_t location,
+                         int32_t msgCode,
+                         const char* pLayerPrefix,
+                         const char* pMsg,
+                         void* pUserData);
+};  // namespace debug
 
 struct Marker : public Dispatchable {
     static bool& active() {
@@ -311,5 +322,5 @@ inline void Marker::setEventName(const vk::Device& device, const VkEvent& _event
     setObjectName(device, (uint64_t)_event, vk::DebugReportObjectTypeEXT::eEvent, name);
 }
 
-}  // namespace debug
+}  // namespace vks
 }  // namespace vks

@@ -216,7 +216,7 @@ public:
 
         CStringVector layers;
         if (enableValidation) {
-            layers = filterLayers(debug::Messenger::getDefaultLayerNames());
+            layers = filterLayers(debug::Messenger::getDefaultLayerNames(getAvailableLayers()));
             instanceCreateInfo.enabledLayerCount = (uint32_t)layers.size();
             instanceCreateInfo.ppEnabledLayerNames = layers.data();
         }
